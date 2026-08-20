@@ -14,6 +14,54 @@ const SESSION_SECRET = process.env.SESSION_SECRET || "sgc-dev-secret-change-me";
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "admin@sleepandgocleaning.com").toLowerCase();
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
 
+/* ---------------- Stripe (plată reală, opțional) ---------------- */
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
+let stripe = null;
+if (STRIPE_SECRET_KEY) {
+  try { stripe = require("stripe")(STRIPE_SECRET_KEY); console.log("[stripe] activat (plată reală)"); }
+  catch (e) { console.log("[stripe] pachetul lipsește sau cheia e invalidă:", e.message); }
+} else {
+  console.log("[stripe] fără chei — aplicația folosește plata simulată");
+}
+
+/* Calculul prețului pe SERVER (nu se poate falsifica din client).
+   Reproduce priceOf() din js/store.js: bază/m², +30% vârf (10–15), +10% weekend/sărbătoare,
+   lenjerie 50 lei/set, consumabile (achiziție + 10% adaos). Întoarce totalul în bani (RON*100). */
+const PRICE = { pricePerSqm: 0.6, linenSetPriceRon: 50, ronPerEur: 4.97, consumableMarkupPct: 10, weekendHolidaySurchargePct: 10, peakStart: 10, peakEnd: 15, peakSurchargePct: 30 };
+const LEGAL_HOLIDAYS = ["01-01", "01-02", "01-24", "05-01", "06-01", "08-15", "11-30", "12-01", "12-25", "12-26"];
+const round2 = (n) => Math.round(n * 100) / 100;
+function priceOfServer(req, st) {
+  const s = st.settings || {};
+  const pps = (s.pricePerSqm > 0) ? s.pricePerSqm : PRICE.pricePerSqm;
+  const ronPerEur = (s.ronPerEur > 0) ? s.ronPerEur : PRICE.ronPerEur;
+  const ronToEur = (ron) => round2(ron / ronPerEur);
+  const h = parseInt(String(req.startTime || "").split(":")[0], 10);
+  const cleaning = (Number(req.sqm) || 0) * pps;
+  const peakPct = (!isNaN(h) && h >= PRICE.peakStart && h < PRICE.peakEnd) ? PRICE.peakSurchargePct : 0;
+  const afterPeak = round2(cleaning + round2(cleaning * peakPct / 100));
+  let surPct = 0;
+  if (req.date) {
+    const d = new Date(req.date + "T00:00:00");
+    if (!isNaN(d.getTime())) {
+      const day = d.getDay(), md = String(req.date).slice(5);
+      if (day === 0 || day === 6 || LEGAL_HOLIDAYS.includes(md)) surPct = PRICE.weekendHolidaySurchargePct;
+    }
+  }
+  const cleaningNet = round2(afterPeak + round2(afterPeak * surPct / 100));
+  const linenSets = req.linens ? (Number(req.linenSets) || 0) : 0;
+  const linenEur = ronToEur(linenSets * PRICE.linenSetPriceRon);
+  const consCostRon = (req.consumables || []).reduce((sum, c) => {
+    const p = (st.products || []).find(x => x.id === c.productId);
+    return sum + (p ? p.priceRon * (Number(c.qty) || 0) : 0);
+  }, 0);
+  const consRon = round2(consCostRon + round2(consCostRon * PRICE.consumableMarkupPct / 100));
+  const consEur = ronToEur(consRon);
+  const totalEur = round2(round2(cleaningNet + linenEur) + consEur);
+  const totalRon = Math.round(totalEur * ronPerEur);   // lei afișați clientului
+  return { totalEur, totalRon, baniRon: totalRon * 100 };
+}
+
 /* ---------------- STOCARE (kv: cheie -> text) ---------------- */
 // Producție (Railway): Postgres. Dev local: fișier JSON.
 let store;
@@ -150,6 +198,46 @@ async function ensureAdmin() {
 
 /* ---------------- App ---------------- */
 const app = express();
+
+// marchează o solicitare ca plătită (idempotent) — folosit de webhook și de /verify
+async function markRequestPaid(reqId, sessionId) {
+  const st = await getState();
+  const r = (st.requests || []).find(x => x.id === reqId);
+  if (!r) return false;
+  if (r.status === "nou") {
+    r.status = "platit";
+    r.paidAt = Date.now();
+    if (sessionId) r.stripeSessionId = sessionId;
+    await saveState(st);
+    console.log("[stripe] solicitare plătită:", reqId);
+  }
+  return true;
+}
+
+// Webhook Stripe — trebuie înregistrat ÎNAINTE de express.json (are nevoie de body-ul brut)
+app.post("/api/pay/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  if (!stripe) return res.status(200).send("stripe off");
+  let event;
+  try {
+    if (STRIPE_WEBHOOK_SECRET) {
+      event = stripe.webhooks.constructEvent(req.body, req.headers["stripe-signature"], STRIPE_WEBHOOK_SECRET);
+    } else {
+      event = JSON.parse(req.body.toString("utf8"));   // dev, fără verificare semnătură
+    }
+  } catch (e) {
+    return res.status(400).send("Webhook signature error: " + e.message);
+  }
+  try {
+    if (event.type === "checkout.session.completed") {
+      const s = event.data.object;
+      if (s.payment_status === "paid" && s.metadata && s.metadata.reqId) {
+        await markRequestPaid(s.metadata.reqId, s.id);
+      }
+    }
+  } catch (e) { console.log("[stripe] webhook handler err:", e.message); }
+  res.json({ received: true });
+});
+
 app.use(express.json({ limit: "6mb" }));
 
 // --- Auth ---
@@ -232,6 +320,59 @@ app.post("/api/state", async (req, res) => {
   // păstrăm parolele intacte: state nu conține parole, deci doar salvăm
   await saveState(incoming);
   res.json({ ok: true });
+});
+
+// --- Plată reală: creează sesiunea de Checkout (autentificat, doar propria solicitare) ---
+app.post("/api/pay/checkout", async (req, res) => {
+  try {
+    const uid = readSession(req);
+    if (!uid) return res.status(401).json({ ok: false, error: "Neautentificat." });
+    if (!stripe) return res.json({ ok: false, error: "stripe_unconfigured" });
+    const reqId = req.body && req.body.reqId;
+    const st = await getState();
+    const r = (st.requests || []).find(x => x.id === reqId);
+    if (!r) return res.status(404).json({ ok: false, error: "Solicitare inexistentă." });
+    if (r.requesterId !== uid) return res.status(403).json({ ok: false, error: "Nu este solicitarea ta." });
+    if (r.status !== "nou") return res.json({ ok: false, error: "already_paid" });
+    const price = priceOfServer(r, st);
+    if (!price.baniRon || price.baniRon < 200) return res.status(400).json({ ok: false, error: "Sumă invalidă." });
+    const proto = (req.headers["x-forwarded-proto"] || "https").split(",")[0];
+    const origin = req.headers.origin || (proto + "://" + req.headers.host);
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: [{
+        price_data: {
+          currency: "ron",
+          product_data: {
+            name: "Curățenie regim hotelier — " + (r.sqm || 0) + " m²",
+            description: (r.date || "") + " · " + (r.startTime || "") + "–" + (r.endTime || ""),
+          },
+          unit_amount: price.baniRon,
+        },
+        quantity: 1,
+      }],
+      metadata: { reqId: r.id, requesterId: uid },
+      success_url: origin + "/?paid=" + encodeURIComponent(r.id) + "&session_id={CHECKOUT_SESSION_ID}",
+      cancel_url: origin + "/?paycancel=" + encodeURIComponent(r.id),
+    });
+    res.json({ ok: true, url: session.url });
+  } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
+});
+
+// --- Confirmă plata după întoarcerea de pe pagina Stripe (success_url) ---
+app.get("/api/pay/verify", async (req, res) => {
+  try {
+    if (!stripe) return res.json({ ok: false, error: "stripe_unconfigured" });
+    const sid = req.query.session_id;
+    if (!sid) return res.status(400).json({ ok: false, error: "Lipsă session_id." });
+    const s = await stripe.checkout.sessions.retrieve(String(sid));
+    if (s && s.payment_status === "paid" && s.metadata && s.metadata.reqId) {
+      await markRequestPaid(s.metadata.reqId, s.id);
+      return res.json({ ok: true, paid: true, reqId: s.metadata.reqId });
+    }
+    res.json({ ok: true, paid: false });
+  } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
 // --- Lead-uri publice (ofertă din simulator / închiriere lenjerii) — fără autentificare ---

@@ -1127,6 +1127,23 @@ body.landing-active { background: var(--h-bg); }
       return MODE;
     },
     mode() { return MODE; },
+    // reîmprospătează starea de pe server (folosit după confirmarea plății)
+    async refresh() { if (MODE === "api") { try { await refreshState(); } catch (e) {} } return db; },
+
+    // ---- Plată reală (Stripe Checkout, doar în modul API) ----
+    // Creează o sesiune de plată pe server și întoarce URL-ul găzduit de Stripe.
+    // Dacă serverul nu are chei Stripe → { ok:false, error:"stripe_unconfigured" } (aplicația cade pe simulare).
+    async payCheckout(reqId) {
+      if (MODE !== "api") return { ok: false, error: "demo" };
+      try { return await apiPOST("/api/pay/checkout", { reqId }); }
+      catch (e) { return { ok: false, error: String(e.message || e) }; }
+    },
+    // La întoarcerea de pe pagina Stripe (success_url) confirmăm plata după session_id.
+    async verifyPayment(sessionId) {
+      if (MODE !== "api") return { ok: false };
+      try { return await apiGET("/api/pay/verify?session_id=" + encodeURIComponent(sessionId)); }
+      catch (e) { return { ok: false, error: String(e.message || e) }; }
+    },
 
     // ---- Sesiune / auth ----
     currentUser() { return db.users.find(u => u.id === db.session) || null; },
@@ -2910,7 +2927,18 @@ body.landing-active { background: var(--h-bg); }
     return card;
   }
 
-  function openPayment(reqId, u) {
+  async function openPayment(reqId, u) {
+    // 1) Încearcă plata REALĂ prin Stripe Checkout (dacă serverul are chei configurate)
+    if (S.mode && S.mode() === "api") {
+      toast("Se pregătește plata securizată…", "");
+      const res = await S.payCheckout(reqId);
+      if (res && res.ok && res.url) { window.location.href = res.url; return; }
+      // dacă Stripe nu e configurat pe server → cădem pe simulare; altă eroare → o arătăm
+      if (res && res.error && !["stripe_unconfigured", "demo"].includes(res.error)) {
+        return toast(res.error === "already_paid" ? "Solicitarea e deja plătită." : res.error, "err");
+      }
+    }
+    // 2) Fallback: simulare (mod demo sau server fără chei Stripe)
     const r = S.requestById(reqId);
     const b = S.breakdown(r);
     modal(`
@@ -4345,8 +4373,28 @@ body.landing-active { background: var(--h-bg); }
   /* ---------- start ---------- */
   // Inițializează stocarea (server Railway sau localStorage), apoi randează.
   // onRemote = re-randare când alt utilizator schimbă datele (polling).
+  // La întoarcerea de pe pagina de plată Stripe (success_url / cancel_url)
+  async function handlePaymentReturn() {
+    const params = new URLSearchParams(location.search);
+    const sessionId = params.get("session_id");
+    const paidId = params.get("paid");
+    const cancelId = params.get("paycancel");
+    if (!sessionId && !paidId && !cancelId) return;
+    history.replaceState({}, "", location.pathname);   // curăță URL-ul
+    if (cancelId) { toast("Plată anulată. Poți relua din «Solicitările mele».", ""); return; }
+    if (sessionId) {
+      const res = await S.verifyPayment(sessionId);
+      if (res && res.ok && res.paid) {
+        await S.refresh();
+        toast("Plată confirmată! Solicitarea e vizibilă Agenților Cleaning.", "ok");
+      } else {
+        toast("Confirmăm plata… dacă nu apare imediat, reîmprospătează în câteva secunde.", "");
+      }
+    }
+  }
+
   S.init(() => { try { renderApp(); } catch (e) {} })
-    .then(() => { renderApp(); initLang(); })
+    .then(async () => { await handlePaymentReturn(); renderApp(); initLang(); })
     .catch(() => { renderApp(); initLang(); });
 })();
 
