@@ -94,12 +94,14 @@ function clearSession(res) {
 }
 
 /* ---------------- Starea aplicației (un singur document JSON) ---------------- */
+const PRODUCTS_SEED_VERSION = 2;   // crește când schimbi lista de mai jos → se aplică pe baza existentă
 const SEED_PRODUCTS = [
-  { id: "p_hartie", name: "Hârtie igienică", unit: "set 4 role", priceRon: 15, lowAt: 4, active: true },
-  { id: "p_apa", name: "Apă (bax 6×2L)", unit: "bax", priceRon: 18, lowAt: 3, active: true },
-  { id: "p_cafea", name: "Cafea", unit: "pungă 250g", priceRon: 22, lowAt: 2, active: true },
-  { id: "p_bomboane", name: "Bomboane", unit: "cutie", priceRon: 12, lowAt: 2, active: true },
-  { id: "p_curatenie", name: "Produse de curățenie", unit: "kit", priceRon: 35, lowAt: 2, active: true },
+  { id: "p_hartie", name: "Hârtie igienică", unit: "rolă", priceRon: 2, lowAt: 4, active: true },
+  { id: "p_apa", name: "Apă (sticlă)", unit: "sticlă", priceRon: 7, lowAt: 6, active: true },
+  { id: "p_cafea", name: "Cafea", unit: "pungă 250g", priceRon: 32, lowAt: 2, active: true },
+  { id: "p_bomboane", name: "Bomboane", unit: "cutie", priceRon: 1, lowAt: 2, active: true },
+  { id: "p_detergent", name: "Detergent vase", unit: "500 ml", priceRon: 5, lowAt: 2, active: true },
+  { id: "p_domestos", name: "Domestos", unit: "sticlă", priceRon: 17, lowAt: 2, active: true },
 ];
 function freshState() {
   return {
@@ -122,6 +124,18 @@ async function saveState(st) { await store.set("state", JSON.stringify(st)); }
 
 function uid(p) { return p + "_" + crypto.randomBytes(6).toString("hex"); }
 function publicUser(u) { const { password, ...rest } = u || {}; return rest; }
+
+// Aplică lista canonică de produse pe baza existentă (o singură dată per versiune)
+async function ensureProducts() {
+  const st = await getState();
+  if (!st.settings) st.settings = {};
+  if ((st.settings.productsSeedVersion || 0) < PRODUCTS_SEED_VERSION) {
+    st.products = SEED_PRODUCTS;
+    st.settings.productsSeedVersion = PRODUCTS_SEED_VERSION;
+    await saveState(st);
+    console.log("[seed] produse actualizate la versiunea", PRODUCTS_SEED_VERSION);
+  }
+}
 
 async function ensureAdmin() {
   const st = await getState();
@@ -220,13 +234,37 @@ app.post("/api/state", async (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Lead-uri publice (ofertă din simulator / închiriere lenjerii) — fără autentificare ---
+app.post("/api/lead", async (req, res) => {
+  try {
+    const b = req.body || {};
+    const type = b.type;
+    const data = b.data || {};
+    if (!["offer", "rental"].includes(type)) return res.status(400).json({ ok: false, error: "Tip invalid." });
+    if (!data.name || !data.phone) return res.status(422).json({ ok: false, error: "Completează numele și telefonul." });
+    const st = await getState();
+    const key = type === "offer" ? "offerLeads" : "rentalLeads";
+    if (!Array.isArray(st[key])) st[key] = [];
+    const base = {
+      id: uid(type), name: String(data.name).slice(0, 120), phone: String(data.phone).slice(0, 40),
+      email: String(data.email || "").slice(0, 190), note: String(data.note || "").slice(0, 500), createdAt: Date.now(),
+    };
+    if (type === "offer") base.quote = data.quote || null;
+    else base.locations = Number(data.locations) || 0;
+    st[key].push(base);
+    await saveState(st);
+    res.json({ ok: true, lead: base });
+  } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
+});
+
 // --- Aplicația (o singură pagină, self-contained) ---
 app.get("*", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
 
 /* ---------------- Boot ---------------- */
 (async () => {
   await store.init();
-  await getState();     // creează starea inițială dacă lipsește
-  await ensureAdmin();  // creează adminul dacă lipsește
+  await getState();      // creează starea inițială dacă lipsește
+  await ensureProducts(); // aplică lista de produse (versiune)
+  await ensureAdmin();   // creează adminul dacă lipsește
   app.listen(PORT, () => console.log("Sleep & Go pe portul " + PORT));
 })();

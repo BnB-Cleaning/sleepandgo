@@ -184,6 +184,13 @@ main { max-width: 1080px; margin: 0 auto; padding: 26px 20px 80px; }
 .navtabs button { background: none; border: none; color: var(--muted); padding: 12px 16px; cursor: pointer; font-size: 14px; font-weight: 600; border-bottom: 2px solid transparent; }
 .navtabs button.active { color: var(--brand); border-bottom-color: var(--brand); }
 
+/* selector discret de limbă (RO / EN / नेपाली) */
+.lang-select { position: fixed; right: 12px; bottom: 12px; z-index: 9999; cursor: pointer;
+  font-size: 12px; font-weight: 600; padding: 5px 8px; border-radius: 8px;
+  border: 1px solid rgba(0,0,0,.18); background: rgba(255,255,255,.9); color: #333;
+  opacity: .7; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+.lang-select:hover { opacity: 1; }
+
 .pill { font-size: 12px; color: var(--muted); background: var(--bg-soft); border: 1px solid var(--line); padding: 3px 9px; border-radius: 20px; }
 a.pill.contact { text-decoration: none; color: var(--brand); border-color: var(--brand); font-weight: 700; }
 a.pill.contact:hover { background: var(--brand); color: #fff; }
@@ -540,6 +547,50 @@ body.landing-active { background: var(--h-bg); }
 .rf-field input, .rf-field textarea { padding: 12px 13px; border-radius: 10px; border: 1px solid var(--h-line); background: var(--h-soft); color: var(--h-ink); font-size: 15px; font-family: inherit; }
 .rf-field input:focus, .rf-field textarea:focus { outline: none; border-color: var(--h-blue); }
 .rf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.rf-field select { padding: 12px 13px; border-radius: 10px; border: 1px solid var(--h-line); background: var(--h-soft); color: var(--h-ink); font-size: 15px; font-family: inherit; }
+
+/* Simulator de preț */
+.h-sim { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+.h-sim-form, .h-sim-result { background: #fff; border: 1px solid var(--h-line); border-radius: 18px; box-shadow: var(--h-shadow); padding: 24px; }
+.h-sim .sim-radio { display: flex; gap: 18px; }
+.h-sim .sim-radio label { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--h-ink); font-weight: 500; }
+.h-sim .sim-cons { display: flex; flex-direction: column; gap: 8px; }
+.h-sim .sim-cons-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14px; color: var(--h-ink); }
+.h-sim .sim-cons-row small { color: var(--h-muted); }
+.h-sim .sim-cons-row input { max-width: 78px; }
+.h-sim .section-title { font-family: "Poppins", sans-serif; font-weight: 700; font-size: 16px; margin: 0 0 12px; color: var(--h-navy); }
+.sim-breakdown { display: flex; flex-direction: column; gap: 8px; }
+.sim-breakdown .sb-row { display: flex; justify-content: space-between; font-size: 14.5px; color: var(--h-ink); }
+.sim-breakdown .sb-row.disc span:last-child { color: #1a9e5f; }
+.sim-total-row { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--h-line); font-weight: 700; font-size: 17px; }
+.sim-total { color: var(--h-blue); font-family: "Poppins", sans-serif; font-size: 24px; font-weight: 800; }
+@media (max-width: 820px){ .h-sim { grid-template-columns: 1fr; } }
+
+/* Simulator în hero (compact) */
+.h-hero-sim { padding: 22px; }
+.h-hero-sim .hs-title { font-family: "Poppins", sans-serif; font-weight: 800; font-size: 18px; color: var(--h-navy); margin-bottom: 14px; }
+.h-hero-sim .rf-field { margin-bottom: 10px; }
+.h-hero-sim .rf-field label { font-size: 12px; }
+.h-hero-sim .rf-field input, .h-hero-sim .rf-field select { padding: 9px 11px; font-size: 14px; }
+.h-hero-sim .sim-radio { gap: 14px; }
+.h-hero-sim .sim-breakdown { margin: 12px 0 0; font-size: 13px; }
+.h-hero-sim .sim-total-row { font-size: 15px; margin-top: 12px; padding-top: 12px; }
+.h-hero-sim .sim-total { font-size: 22px; }
+.h-hero-sim .hs-offer { margin-top: 14px; border-top: 1px dashed var(--h-line); padding-top: 14px; }
+.h-hero-sim .hs-offer .rf-field { margin-bottom: 10px; }
+/* produse (consumabile) — listă organizată */
+.h-hero-sim .sim-cons { display: flex; flex-direction: column; background: var(--h-soft); border: 1px solid var(--h-line); border-radius: 10px; padding: 4px 10px; }
+.h-hero-sim .sim-cons-row { display: grid; grid-template-columns: 1fr 62px; align-items: center; gap: 10px; padding: 7px 0; font-size: 13px; }
+.h-hero-sim .sim-cons-row + .sim-cons-row { border-top: 1px solid var(--h-line); }
+.h-hero-sim .sim-cons-row > span { color: var(--h-ink); line-height: 1.2; }
+.h-hero-sim .sim-cons-row small { color: var(--h-muted); }
+.h-hero-sim .sim-cons-row input { max-width: 62px; text-align: center; padding: 6px 6px; margin: 0; }
+/* CTA-uri: adaugă locație + creare cont */
+.h-hero-sim .hs-alt { margin-top: 14px; border-top: 1px dashed var(--h-line); padding-top: 14px; }
+.h-hero-sim .hs-alt .h-btn { margin-bottom: 8px; }
+.h-hero-sim .hs-signup { text-align: center; font-size: 13px; color: var(--h-muted); margin: 0; }
+.h-hero-sim .hs-signup a { color: var(--h-blue); font-weight: 700; cursor: pointer; text-decoration: none; }
+.h-hero-sim .hs-signup a:hover { text-decoration: underline; }
 
 /* Roles */
 .h-roles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
@@ -623,7 +674,7 @@ body.landing-active { background: var(--h-bg); }
 
   /* --- Configurare preț & business --- */
   const CONFIG = {
-    pricePerSqm: 1,        // 1 € / m²  (curățenie)
+    pricePerSqm: 0.6,      // preț de BAZĂ (off-peak) € / m²  — „de la"
     commissionPct: 30,     // % reținut de platformă (admin); restul merge la Agent Cleaning
     currency: "€",
     // Lenjerie: 50 lei / set (tarif spălat & călcat), afișat în €. 70% Agentul Cleaning de lenjerie, 30% comision admin.
@@ -646,8 +697,8 @@ body.landing-active { background: var(--h-bg); }
     schedule: {
       open: 8, close: 19,        // program de lucru 8:00–19:00 (seara extinsă pentru sloturile de după 15:00)
       minHours: 4,               // interval minim de lucru: 4 ore
-      peakStart: 10, peakEnd: 15,// interval de vârf 10:00–15:00 = preț întreg (1 €/m²)
-      discountPct: 20,           // reducere în afara vârfului → 0.8 €/m² (înainte de 10:00 sau de la 15:00)
+      peakStart: 10, peakEnd: 15,// interval de vârf 10:00–15:00 = +adaos
+      peakSurchargePct: 30,      // în vârf (10–15) → +30% peste prețul de bază (0.6 → 0.78 €/m²)
     },
     bookingCutoffHour: 20,       // solicitările se pot trimite până la ora 20:00
     weekendHolidaySurchargePct: 10,  // +10% în weekend și sărbători legale
@@ -695,7 +746,7 @@ body.landing-active { background: var(--h-bg); }
 
   function seed() {
     return {
-      settings: { commissionPct: CONFIG.commissionPct, ronPerEur: CONFIG.ronPerEur },
+      settings: { commissionPct: CONFIG.commissionPct, ronPerEur: CONFIG.ronPerEur, pricePerSqm: CONFIG.pricePerSqm },
       users: [
         { id: "u_admin", name: "Administrator", email: "admin@sleepandgo.com", password: "admin", role: "admin", area: null },
         {
@@ -759,11 +810,12 @@ body.landing-active { background: var(--h-bg); }
       // catalog de consumabile (prețuri de achiziție în lei) — gestionat de admin
       // lowAt = prag de alertă: când stocul unui Agent Cleaning ≤ lowAt, adminul e alertat să livreze
       products: [
-        { id: "p_hartie", name: "Hârtie igienică", unit: "set 4 role", priceRon: 15, lowAt: 4, active: true },
-        { id: "p_apa", name: "Apă (bax 6×2L)", unit: "bax", priceRon: 18, lowAt: 3, active: true },
-        { id: "p_cafea", name: "Cafea", unit: "pungă 250g", priceRon: 22, lowAt: 2, active: true },
-        { id: "p_bomboane", name: "Bomboane", unit: "cutie", priceRon: 12, lowAt: 2, active: true },
-        { id: "p_curatenie", name: "Produse de curățenie", unit: "kit", priceRon: 35, lowAt: 2, active: true },
+        { id: "p_hartie", name: "Hârtie igienică", unit: "rolă", priceRon: 2, lowAt: 4, active: true },
+        { id: "p_apa", name: "Apă (sticlă)", unit: "sticlă", priceRon: 7, lowAt: 6, active: true },
+        { id: "p_cafea", name: "Cafea", unit: "pungă 250g", priceRon: 32, lowAt: 2, active: true },
+        { id: "p_bomboane", name: "Bomboane", unit: "cutie", priceRon: 1, lowAt: 2, active: true },
+        { id: "p_detergent", name: "Detergent vase", unit: "500 ml", priceRon: 5, lowAt: 2, active: true },
+        { id: "p_domestos", name: "Domestos", unit: "sticlă", priceRon: 17, lowAt: 2, active: true },
       ],
       session: null,
     };
@@ -841,14 +893,14 @@ body.landing-active { background: var(--h-bg); }
   const round2 = (n) => Math.round(n * 100) / 100;
 
   /* --- Preț dinamic pe interval orar ---
-     Preț întreg în vârf (10:00–15:00). Reducere în afara vârfului:
-     rezervări care încep înainte de 10:00 sau de la 15:00 → −discountPct%. */
+     Preț de bază în afara vârfului. În vârf (10:00–15:00) → +peakSurchargePct%. */
   const parseHour = (t) => { const h = parseInt(String(t || "").split(":")[0], 10); return isNaN(h) ? null : h; };
-  function discountPctFor(startTime) {
+  // adaosul de vârf (%) pentru ora de început: peakSurchargePct dacă e în vârf, altfel 0
+  function peakSurchargePctFor(startTime) {
     const s = CONFIG.schedule;
     const h = parseHour(startTime);
     if (h == null) return 0;
-    return (h < s.peakStart || h >= s.peakEnd) ? s.discountPct : 0;
+    return (h >= s.peakStart && h < s.peakEnd) ? s.peakSurchargePct : 0;
   }
   function isPeak(startTime) {
     const s = CONFIG.schedule, h = parseHour(startTime);
@@ -868,6 +920,8 @@ body.landing-active { background: var(--h-bg); }
 
   function commissionPct() { return (db.settings && db.settings.commissionPct != null) ? db.settings.commissionPct : CONFIG.commissionPct; }
   function ronPerEur() { return (db.settings && db.settings.ronPerEur) ? db.settings.ronPerEur : CONFIG.ronPerEur; }
+  // preț de bază curățenie (€/m²) — editabil din admin; folosit peste tot (home, simulator, solicitări)
+  function pricePerSqm() { return (db.settings && db.settings.pricePerSqm > 0) ? db.settings.pricePerSqm : CONFIG.pricePerSqm; }
   const ronToEur = (ron) => round2(ron / ronPerEur());
 
   /* --- Calcule de preț ---
@@ -883,14 +937,14 @@ body.landing-active { background: var(--h-bg); }
   }
 
   function priceOf(req) {
-    const cleaning = (Number(req.sqm) || 0) * CONFIG.pricePerSqm;
-    const discPct = discountPctFor(req.startTime);
-    const discount = round2(cleaning * discPct / 100);
-    const afterDiscount = round2(cleaning - discount);
-    // suprataxă weekend / sărbătoare legală (+10%) aplicată după reducerea de interval
+    const cleaning = (Number(req.sqm) || 0) * pricePerSqm();   // preț de bază (off-peak)
+    const peakPct = peakSurchargePctFor(req.startTime);        // +30% în vârf (10–15)
+    const peakAdd = round2(cleaning * peakPct / 100);
+    const afterPeak = round2(cleaning + peakAdd);
+    // suprataxă weekend / sărbătoare legală (+10%) aplicată după adaosul de vârf
     const surPct = surchargePctFor(req.date);
-    const surcharge = round2(afterDiscount * surPct / 100);
-    const cleaningNet = round2(afterDiscount + surcharge);
+    const surcharge = round2(afterPeak * surPct / 100);
+    const cleaningNet = round2(afterPeak + surcharge);
 
     const linenSets = req.linens ? (Number(req.linenSets) || 0) : 0;
     const linenRon = linenSets * CONFIG.linenSetPriceRon;   // 45 lei / set
@@ -905,7 +959,7 @@ body.landing-active { background: var(--h-bg); }
     const serviceTotal = round2(cleaningNet + linenEur);        // servicii (se comisionează)
     const total = round2(serviceTotal + consumablesEur);        // + consumabile (achiziție + adaos)
     return {
-      cleaning, discPct, discount, surPct, surcharge, cleaningNet,
+      cleaning, peakPct, peakAdd, surPct, surcharge, cleaningNet,
       linenIncluded: !!req.linens, linenSets, linenRon, linenEur,
       consumablesCostRon, consumablesMarkupRon, consumablesRon, consumablesEur, markupPct: CONFIG.consumableMarkupPct,
       serviceTotal, total,
@@ -971,8 +1025,8 @@ body.landing-active { background: var(--h-bg); }
   const Store = {
     CONFIG, STATUS, STATUS_LABEL, LOC_STATUS_LABEL,
     priceOf, breakdown,
-    discountPctFor, isPeak, validateSlot, surchargePctFor, isWeekendOrHoliday,
-    commissionPct, ronPerEur, ronToEur,
+    peakSurchargePctFor, isPeak, validateSlot, surchargePctFor, isWeekendOrHoliday,
+    commissionPct, ronPerEur, ronToEur, pricePerSqm,
     setCommissionPct(pct) {
       if (!db.settings) db.settings = {};
       db.settings.commissionPct = Math.max(0, Math.min(100, Number(pct) || 0));
@@ -983,6 +1037,37 @@ body.landing-active { background: var(--h-bg); }
       const r = Number(rate);
       db.settings.ronPerEur = (r > 0) ? r : CONFIG.ronPerEur;
       save(db); return db.settings.ronPerEur;
+    },
+    setPricePerSqm(v) {
+      if (!db.settings) db.settings = {};
+      const p = Number(v);
+      db.settings.pricePerSqm = (p > 0) ? round2(p) : CONFIG.pricePerSqm;
+      save(db); return db.settings.pricePerSqm;
+    },
+    // simulator de preț (home): construiește o pseudo-solicitare și rulează calculul dinamic
+    quote(data) {
+      return priceOf({
+        sqm: Number(data.sqm) || 0,
+        startTime: data.startTime,
+        date: data.date,
+        linens: !!data.linens,
+        linenSets: Number(data.linenSets) || 0,
+        consumables: data.consumables || [],
+      });
+    },
+    // cereri de ofertă din simulatorul de pe home
+    offerLeads() { return (db.offerLeads || []).slice().sort((a, b) => b.createdAt - a.createdAt); },
+    // publice (vizitator nelogat): în modul API merg printr-un endpoint dedicat, fără autentificare
+    async addOfferLead(data) {
+      if (!data.name || !data.phone) return { ok: false, error: "Completează numele și telefonul." };
+      if (MODE === "api") {
+        const r = await apiPOST("/api/lead", { type: "offer", data });
+        if (r.ok) await refreshState();
+        return r;
+      }
+      if (!db.offerLeads) db.offerLeads = [];
+      const lead = { id: uid("offer"), name: data.name, phone: data.phone, email: data.email || "", note: data.note || "", quote: data.quote || null, createdAt: Date.now() };
+      db.offerLeads.push(lead); save(db); return { ok: true, lead };
     },
     // lenjeria e preluată de: Agentul Cleaning de curățenie (dacă vrea) SAU un „Serviciu lenjerie"
     // (rol spalatorie) atunci când Agentul Cleaning de curățenie a refuzat.
@@ -1122,10 +1207,15 @@ body.landing-active { background: var(--h-bg); }
 
     // ---- Închiriere lenjerii (înregistrări / lead-uri de pe landing) ----
     rentalLeads() { return (db.rentalLeads || []).slice().sort((a, b) => b.createdAt - a.createdAt); },
-    addRentalLead({ name, phone, email, locations, note }) {
-      if (!name || !phone) return { ok: false, error: "Completează numele și telefonul." };
+    async addRentalLead(data) {
+      if (!data.name || !data.phone) return { ok: false, error: "Completează numele și telefonul." };
+      if (MODE === "api") {
+        const r = await apiPOST("/api/lead", { type: "rental", data });
+        if (r.ok) await refreshState();
+        return r;
+      }
       if (!db.rentalLeads) db.rentalLeads = [];
-      const lead = { id: uid("lead"), name, phone, email: email || "", locations: Number(locations) || 0, note: note || "", createdAt: Date.now() };
+      const lead = { id: uid("lead"), name: data.name, phone: data.phone, email: data.email || "", locations: Number(data.locations) || 0, note: data.note || "", createdAt: Date.now() };
       db.rentalLeads.push(lead); save(db); return { ok: true, lead };
     },
 
@@ -1512,6 +1602,8 @@ body.landing-active { background: var(--h-bg); }
     return t.content.childElementCount > 1 ? t.content : t.content.firstElementChild;
   };
   const money = (n) => `${C.currency}${Number(n).toFixed(2)}`;
+  const leiOf = (eur) => Math.round((Number(eur) || 0) * S.ronPerEur());       // € → lei (curs admin)
+  const moneyBoth = (eur) => `${money(eur)} · ≈ ${leiOf(eur)} lei`;             // afișare dublă € + lei
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
   const fmtWhen = (ts) => { try { const d = new Date(ts); return d.toLocaleDateString("ro-RO") + " " + d.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } };
   const fmtClock = (ts) => { try { return new Date(ts).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" }); } catch (e) { return "—"; } };
@@ -1800,6 +1892,11 @@ body.landing-active { background: var(--h-bg); }
     topbar.hidden = true;
     document.body.classList.add("landing-active");
     app.innerHTML = "";
+    // preț de bază (off-peak, editabil din admin) → afișat live; vârf = +peakSurchargePct%
+    const basePrice = S.pricePerSqm();
+    const offPeak = basePrice;
+    const peakPrice = Math.round(basePrice * (100 + C.schedule.peakSurchargePct)) / 100;
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
     const services = [
       ["🛏️", "Curățenie regim hotelier", "Turnover complet între check-out și check-in: curățenie, schimbat lenjeria, pregătit locația pentru următorii oaspeți."],
       ["🧻", "Alimentare consumabile", "Hârtie igienică, apă, cafea, bomboane și produse de curățenie — reaprovizionare la fiecare intervenție."],
@@ -1842,47 +1939,43 @@ body.landing-active { background: var(--h-bg); }
               <button class="h-btn ghost lg" data-go="register">Verifică zona de activitate</button>
             </div>
             <div class="h-trust">
-              <div class="item"><span class="n">de la 0.8 €<span style="font-size:15px">/m²</span></span><span class="l">în afara orelor de vârf</span></div>
+              <div class="item"><span class="n">de la ${offPeak} €<span style="font-size:15px">/m²</span></span><span class="l">în afara orelor de vârf</span></div>
               <div class="item"><span class="n">8–19</span><span class="l">program zilnic</span></div>
               <div class="item"><span class="n">12+</span><span class="l">zone deservite</span></div>
             </div>
           </div>
           <div class="h-preview">
             <div class="pv-glow"></div>
-            <div class="pv-chip a">📍 București · Sector 3</div>
-            <div class="card-mock">
-              <div class="pv-top">
-                <div>
-                  <h3>Curățenie · 55 m²</h3>
-                  <div class="pv-meta">
-                    <span>📅 Vineri · 10:00–14:00</span>
-                    <span>🛏️ 2 seturi lenjerie</span>
-                    <span>🧴 3 consumabile</span>
-                  </div>
+            <div class="pv-chip a">💶 Calculează instant</div>
+            <div class="card-mock h-hero-sim" id="heroSim">
+              <div class="hs-title">Simulator de preț</div>
+              <div class="rf-row">
+                <div class="rf-field"><label>Suprafață (m²)</label><input type="number" id="simSqm" min="1" value="24" autocomplete="off" /></div>
+                <div class="rf-field"><label>Ora început</label><select id="simStart" autocomplete="off">${hourOpts(C.schedule.open, C.schedule.close - C.schedule.minHours, "08:00")}</select></div>
+              </div>
+              <div class="rf-row">
+                <div class="rf-field"><label>Data</label><input type="date" id="simDate" value="${tomorrow}" min="${tomorrow}" autocomplete="off" /></div>
+                <div class="rf-field" id="simSetsWrap"><label>Lenjerii (seturi)</label><input type="number" id="simSets" min="0" value="1" autocomplete="off" /></div>
+              </div>
+              <div class="rf-field"><label>Lenjerie</label>
+                <div class="sim-radio">
+                  <label><input type="radio" name="simLinen" value="with" checked /> Cu lenjerie</label>
+                  <label><input type="radio" name="simLinen" value="without" /> Fără</label>
                 </div>
-                <span class="pv-badge">Plătită</span>
               </div>
-              <div class="pv-cons">
-                <div class="pv-cons-row"><span>🧻 Hârtie igienică</span><span>× 2</span></div>
-                <div class="pv-cons-row"><span>💧 Apă (bax 6×2L)</span><span>× 1</span></div>
-                <div class="pv-cons-row"><span>☕ Cafea</span><span>× 1</span></div>
-              </div>
-              <div class="pv-sum">
-                <div class="pv-line"><span>Curățenie (55 m²)</span><span>€55.00</span></div>
-                <div class="pv-line"><span>Lenjerie (2 × 50 lei)</span><span>≈ €20.12</span></div>
-                <div class="pv-line"><span>Consumabile (70 lei + 10%)</span><span>≈ €15.49</span></div>
-                <div class="pv-line total"><span>Total în avans</span><span class="amt">€90.61</span></div>
-              </div>
-              <div class="pv-exec">
-                <div class="pv-exec-av">AP</div>
-                <div class="pv-exec-info">
-                  <div class="pv-exec-name">Ana Popescu</div>
-                  <div class="pv-exec-role">Agent Cleaning · Sector 3</div>
+              <div class="rf-field"><label>Consumabile (opțional)</label>
+                <div class="sim-cons">
+                  ${S.activeProducts().map(p => `<label class="sim-cons-row"><span>${esc(p.name)} <small>(${p.priceRon} lei)</small></span><input type="number" class="simCons" data-pid="${p.id}" min="0" value="0" autocomplete="off" /></label>`).join("")}
                 </div>
-                <div class="pv-exec-rating">★ 4.9 <small>(37)</small></div>
+              </div>
+              <div id="simBreakdown" class="sim-breakdown"></div>
+              <div class="sim-total-row"><span>Total estimativ</span><span id="simTotal" class="sim-total">€0.00</span></div>
+              <p class="hint" id="simNote" style="color:var(--h-muted);margin:6px 0 0"></p>
+              <div class="hs-alt">
+                <button class="h-btn primary" type="button" data-go="register" style="width:100%">Mergi la înregistrare și trimite solicitarea</button>
+                <p class="hs-signup">Nu ai cont? <a data-go="register">Creează cont</a></p>
               </div>
             </div>
-            <div class="pv-chip b">🧹 Preluată de Agent Cleaning</div>
           </div>
         </div></section>
 
@@ -1996,13 +2089,13 @@ body.landing-active { background: var(--h-bg); }
         <section class="h-section soft" id="preturi"><div class="wrap">
           <div class="h-section-head">
             <div class="eyebrow">Transparent</div>
-            <h2>Curățenie de la <span style="color:var(--h-blue)">0.8 €/m²</span></h2>
-            <p>Preț dinamic: 0.8 €/m² în afara orelor de vârf, 1 €/m² în intervalul de vârf (10:00–15:00), +10% în weekend și de sărbătorile legale. Fără costuri ascunse — vezi totalul înainte să plătești.</p>
+            <h2>Curățenie de la <span style="color:var(--h-blue)">${offPeak} €/m² (≈ ${leiOf(offPeak)} lei)</span></h2>
+            <p>Preț dinamic: ${offPeak} €/m² în afara orelor de vârf, ${peakPrice} €/m² în intervalul de vârf (10:00–15:00, +${C.schedule.peakSurchargePct}%), +${C.weekendHolidaySurchargePct}% în weekend și de sărbătorile legale. Fără costuri ascunse — vezi totalul înainte să plătești.</p>
           </div>
           <div class="h-pricing">
-            <div class="h-price"><div class="p-label">Curățenie (off-peak)</div><div class="p-val">0.8 €<span> / m²</span></div><div class="p-note">Înainte de 10:00 sau de la 15:00. În vârf (10–15): 1 €/m².</div></div>
-            <div class="h-price"><div class="p-label">Weekend / sărbători</div><div class="p-val">+10<span>%</span></div><div class="p-note">Suprataxă pentru sâmbătă, duminică și sărbătorile legale.</div></div>
-            <div class="h-price"><div class="p-label">Lenjerie (set)</div><div class="p-val">${money(S.ronToEur(C.linenSetPriceRon))}</div><div class="p-note">${C.linenSetPriceRon} lei/set · plic, cearșaf, 2 fețe de pernă, 2 prosoape, 1 prosop de baie.</div></div>
+            <div class="h-price"><div class="p-label">Curățenie (de la)</div><div class="p-val">${offPeak} €<span> / m² · ≈ ${leiOf(offPeak)} lei</span></div><div class="p-note">Preț de bază, înainte de 10:00 sau de la 15:00.</div></div>
+            <div class="h-price"><div class="p-label">Interval de vârf (10–15)</div><div class="p-val">+${C.schedule.peakSurchargePct}<span>%</span></div><div class="p-note">${peakPrice} €/m² (≈ ${leiOf(peakPrice)} lei) în intervalul de vârf.</div></div>
+            <div class="h-price"><div class="p-label">Lenjerie (set)</div><div class="p-val">${money(S.ronToEur(C.linenSetPriceRon))}<span> · ${C.linenSetPriceRon} lei</span></div><div class="p-note">${C.linenSetPriceRon} lei/set · plic, cearșaf, 2 fețe de pernă, 2 prosoape, 1 prosop de baie.</div></div>
           </div>
           <p class="hint" style="text-align:center;margin-top:20px;color:var(--h-muted)">⏰ Solicitările se trimit până la ora 20:00.</p>
         </div></section>
@@ -2057,11 +2150,11 @@ body.landing-active { background: var(--h-bg); }
       if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
     });
     const rentalForm = $("#rentalForm");
-    if (rentalForm) rentalForm.onsubmit = (e) => {
+    if (rentalForm) rentalForm.onsubmit = async (e) => {
       e.preventDefault();
       const f = e.target;
       const payload = { name: f.name.value, phone: f.phone.value, email: f.email.value, locations: f.locations.value, note: f.note.value };
-      const res = S.addRentalLead(payload);
+      const res = await S.addRentalLead(payload);
       if (!res.ok) return toast(res.error, "err");
       // Trimite emailul către administrator (funcționează pe domeniu, prin send-rental.php)
       try {
@@ -2072,6 +2165,58 @@ body.landing-active { background: var(--h-bg); }
         }).catch(() => {});
       } catch (err) { /* fără backend (ex: demo/artifact) — rămâne salvat local */ }
       toast("Înregistrare trimisă! Te contactăm în curând.", "ok");
+      f.reset();
+    };
+
+    /* ---- Simulator de preț ---- */
+    const readSimConsumables = () => [...document.querySelectorAll(".simCons")]
+      .map(i => ({ productId: i.dataset.pid, qty: Number(i.value) || 0 })).filter(c => c.qty > 0);
+    const readSim = () => {
+      const linens = ($('input[name="simLinen"]:checked') || {}).value !== "without";
+      return {
+        sqm: $("#simSqm") ? $("#simSqm").value : 0,
+        date: $("#simDate") ? $("#simDate").value : "",
+        startTime: $("#simStart") ? $("#simStart").value : "10:00",
+        linens, linenSets: $("#simSets") ? $("#simSets").value : 0,
+        consumables: readSimConsumables(),
+      };
+    };
+    function recalcSim() {
+      if (!$("#simTotal")) return;
+      const d = readSim();
+      const wrap = $("#simSetsWrap"); if (wrap) wrap.style.display = d.linens ? "" : "none";
+      const q = S.quote(d);
+      const rows = [];
+      rows.push(`<div class="sb-row"><span>Curățenie (${Number(d.sqm) || 0} m²)</span><span>${money(q.cleaning)}</span></div>`);
+      if (q.peakPct) rows.push(`<div class="sb-row sur"><span>Adaos interval de vârf (+${q.peakPct}%)</span><span>+${money(q.peakAdd)}</span></div>`);
+      if (q.surPct) rows.push(`<div class="sb-row sur"><span>Weekend / sărbătoare (+${q.surPct}%)</span><span>+${money(q.surcharge)}</span></div>`);
+      if (q.linenIncluded && q.linenSets > 0) rows.push(`<div class="sb-row"><span>Lenjerie (${q.linenSets} × ${C.linenSetPriceRon} lei)</span><span>≈ ${money(q.linenEur)}</span></div>`);
+      if (q.consumablesRon > 0) rows.push(`<div class="sb-row"><span>Consumabile (+${q.markupPct}% adaos)</span><span>≈ ${money(q.consumablesEur)}</span></div>`);
+      $("#simBreakdown").innerHTML = rows.join("");
+      $("#simTotal").innerHTML = `${money(q.total)} <small style="font-size:14px;color:var(--h-muted);font-weight:600">≈ ${leiOf(q.total)} lei</small>`;
+      const peak = S.isPeak(d.startTime), wh = S.isWeekendOrHoliday(d.date);
+      $("#simNote").textContent = (peak ? `Interval de vârf — +${C.schedule.peakSurchargePct}%.` : "În afara orelor de vârf — preț de bază.") + (wh ? ` Weekend/sărbătoare — +${C.weekendHolidaySurchargePct}%.` : "");
+    }
+    const simSection = $("#heroSim");
+    if (simSection) {
+      // forțează consumabilele la 0 la încărcare (unele browsere restaurează valori vechi)
+      document.querySelectorAll(".simCons").forEach(i => { i.value = "0"; });
+      ["input", "change"].forEach(ev => simSection.addEventListener(ev, recalcSim));
+      recalcSim();
+    }
+
+    const offerForm = $("#offerForm");
+    if (offerForm) offerForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      const d = readSim();
+      const q = S.quote(d);
+      const res = await S.addOfferLead({
+        name: f.name.value, phone: f.phone.value, email: f.email ? f.email.value : "", note: f.note ? f.note.value : "",
+        quote: { sqm: Number(d.sqm) || 0, date: d.date, startTime: d.startTime, linens: d.linens, linenSets: Number(d.linenSets) || 0, total: q.total },
+      });
+      if (!res.ok) return toast(res.error, "err");
+      toast("Cerere de ofertă trimisă! Te contactăm în curând.", "ok");
       f.reset();
     };
   }
@@ -2395,6 +2540,8 @@ body.landing-active { background: var(--h-bg); }
   function renderNewRequest(u) {
     const body = $("#solBody");
     const sch = C.schedule;
+    // data implicită = mâine (și minim mâine, ca să nu se aleagă o zi trecută)
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
     const approved = S.usableLocationsOfOwner(u.id);   // aprobate ȘI cu Agent Cleaning activ în zonă
     const waiting = S.approvedLocationsOfOwner(u.id).filter(l => !S.hasActiveExecutorInArea(l.area));
 
@@ -2421,7 +2568,7 @@ body.landing-active { background: var(--h-bg); }
             </div>
             <div class="field">
               <label>Data dorită</label>
-              <input type="date" name="date" required />
+              <input type="date" name="date" required value="${tomorrow}" min="${tomorrow}" />
             </div>
             <div class="row-2">
               <div class="field">
@@ -2473,8 +2620,8 @@ body.landing-active { background: var(--h-bg); }
             <div class="section-title" style="margin-top:0">Rezumat cost</div>
             <div class="summary" id="summary"></div>
             <div class="pricing-legend">
-              <div class="pl-row"><span class="pl-dot peak"></span> Vârf ${sch.peakStart}:00–${sch.peakEnd}:00 · ${money(C.pricePerSqm)}/m²</div>
-              <div class="pl-row"><span class="pl-dot off"></span> Înainte de ${sch.peakStart}:00 sau de la ${sch.peakEnd}:00 · <strong>${money(C.pricePerSqm * (1 - sch.discountPct / 100))}/m²</strong> (−${sch.discountPct}%)</div>
+              <div class="pl-row"><span class="pl-dot off"></span> Înainte de ${sch.peakStart}:00 sau de la ${sch.peakEnd}:00 · <strong>${money(S.pricePerSqm())}/m²</strong> (preț de bază)</div>
+              <div class="pl-row"><span class="pl-dot peak"></span> Vârf ${sch.peakStart}:00–${sch.peakEnd}:00 · <strong>${money(Math.round(S.pricePerSqm() * (100 + sch.peakSurchargePct)) / 100)}/m²</strong> (+${sch.peakSurchargePct}%)</div>
               <div class="pl-row"><span class="pl-dot" style="background:var(--warn)"></span> Weekend / sărbători legale · <strong>+${C.weekendHolidaySurchargePct}%</strong></div>
             </div>
             <p class="hint" style="margin-top:12px">Program ${sch.open}:00–${sch.close}:00 · interval minim ${sch.minHours} ore. ⏰ Solicitările se trimit până la ora <strong>${C.bookingCutoffHour}:00</strong>. Plata în avans; solicitarea devine vizibilă Agenților Cleaning din zonă după confirmare.</p>
@@ -2503,14 +2650,14 @@ body.landing-active { background: var(--h-bg); }
         : "Lenjeria proprie trebuie găsită de Agent Cleaning la începerea activității; altfel nu se pune pe pat.";
       $("#summary").innerHTML = `
         <div class="line"><span>Curățenie (${sqm} m²)</span><span>${money(p.cleaning)}</span></div>
-        ${p.discPct ? `<div class="line disc"><span>Reducere interval orar (−${p.discPct}%)</span><span>−${money(p.discount)}</span></div>`
-          : `<div class="line"><span>Interval de vârf</span><span class="pill">preț întreg</span></div>`}
+        ${p.peakPct ? `<div class="line" style="color:var(--warn)"><span>Adaos interval de vârf (+${p.peakPct}%)</span><span>+${money(p.peakAdd)}</span></div>`
+          : `<div class="line"><span>În afara orelor de vârf</span><span class="pill">preț de bază</span></div>`}
         ${p.surPct ? `<div class="line" style="color:var(--warn)"><span>Weekend / sărbătoare (+${p.surPct}%)</span><span>+${money(p.surcharge)}</span></div>` : ""}
         ${withLinen && linenSets > 0
           ? `<div class="line"><span>Lenjerie (${linenSets} × ${C.linenSetPriceRon} lei)</span><span>${p.linenRon} lei ≈ ${money(p.linenEur)}</span></div>`
           : `<div class="line"><span>Lenjerie</span><span class="pill">${withLinen ? "0 seturi" : "fără (proprie)"}</span></div>`}
         ${p.consumablesRon > 0 ? `<div class="line"><span>Consumabile (achiziție ${p.consumablesCostRon} + ${p.markupPct}% adaos)</span><span>${p.consumablesRon} lei ≈ ${money(p.consumablesEur)}</span></div>` : ""}
-        <div class="line total"><span>Total de plată</span><span class="amt">${money(p.total)}</span></div>`;
+        <div class="line total"><span>Total de plată</span><span class="amt">${moneyBoth(p.total)}</span></div>`;
     };
 
     body.querySelectorAll("#linenMode .role-opt").forEach(o => o.onclick = () => {
@@ -2669,16 +2816,16 @@ body.landing-active { background: var(--h-bg); }
       </div>
       <div class="stripe-amount">
         <span class="stripe-amt-label">Sleep &amp; Go Cleaning</span>
-        <span class="stripe-amt-value">${money(b.total)}</span>
+        <span class="stripe-amt-value">${moneyBoth(b.total)}</span>
       </div>
       <div class="summary" style="margin-bottom:16px">
         <div class="line"><span>Curățenie (${r.sqm} m²)</span><span>${money(b.cleaning)}</span></div>
-        ${b.discPct ? `<div class="line disc"><span>Reducere interval orar (−${b.discPct}%)</span><span>−${money(b.discount)}</span></div>` : ""}
+        ${b.peakPct ? `<div class="line" style="color:var(--warn)"><span>Adaos interval de vârf (+${b.peakPct}%)</span><span>+${money(b.peakAdd)}</span></div>` : ""}
         ${b.surPct ? `<div class="line" style="color:var(--warn)"><span>Weekend / sărbătoare (+${b.surPct}%)</span><span>+${money(b.surcharge)}</span></div>` : ""}
         ${b.linenIncluded && b.linenSets > 0 ? `<div class="line"><span>Lenjerie (${b.linenSets} × ${C.linenSetPriceRon} lei)</span><span>${b.linenRon} lei ≈ ${money(b.linenEur)}</span></div>` : ""}
         ${b.consumablesRon > 0 ? `<div class="line"><span>Consumabile (cu ${b.markupPct}% adaos)</span><span>${b.consumablesRon} lei ≈ ${money(b.consumablesEur)}</span></div>` : ""}
         <div class="line"><span>Interval ${esc(r.date)} · ${esc(r.startTime)}–${esc(r.endTime)}</span><span></span></div>
-        <div class="line total"><span>Total de plată</span><span class="amt">${money(b.total)}</span></div>
+        <div class="line total"><span>Total de plată</span><span class="amt">${moneyBoth(b.total)}</span></div>
       </div>
       <div class="field"><label>Email</label><input id="pc_email" type="email" value="${esc(u.email)}"/></div>
       <div class="field">
@@ -2693,7 +2840,7 @@ body.landing-active { background: var(--h-bg); }
         <div class="hint">Card de test: <span class="link" id="fillTest">4242 4242 4242 4242</span> · orice dată viitoare · orice CVC</div>
       </div>
       <div class="field"><label>Nume pe card</label><input id="pc_name" placeholder="Nume Prenume" value="${esc(u.name)}"/></div>
-      <button class="btn btn-block stripe-pay" id="payBtn">Plătește ${money(b.total)}</button>
+      <button class="btn btn-block stripe-pay" id="payBtn">Plătește ${moneyBoth(b.total)}</button>
       <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="_cancelUnpaid('${r.id}')">Anulează</button>
       <p class="stripe-foot">🔒 Plată securizată prin Stripe. Suma e reținută în avans. După preluare, curățenia (${money(b.cleaningPayout)})${b.linenIncluded && b.linenSets > 0 ? ` și serviciul de lenjerie (${money(b.linenPayout)})` : ""} se eliberează către Agenți Cleaning la finalizare (comision platformă ${b.pct}%).</p>
     `);
@@ -3258,9 +3405,34 @@ body.landing-active { background: var(--h-bg); }
         <div class="card stat"><span class="label">Finalizate</span><span class="value">${s.completed}</span></div>
         <div class="card stat"><span class="label">Agenți Cleaning / Clienți</span><span class="value">${s.executors} / ${s.requesters}</span></div>
       </div>
+      ${(() => {
+        const offers = S.offerLeads();
+        if (!offers.length) return "";
+        return `<div class="card" style="margin-top:16px">
+          <div class="section-title" style="margin-top:0">💬 Cereri de ofertă (simulator) — ${offers.length}</div>
+          <div class="req">${offers.map(o => `
+            <div class="req-item">
+              <div class="req-top">
+                <div><h3 style="margin:0">${esc(o.name)}</h3>
+                  <div class="req-meta"><span>📞 ${esc(o.phone)}</span>${o.email ? `<span>✉️ ${esc(o.email)}</span>` : ""}<span>🕒 ${fmtWhen(o.createdAt)}</span></div>
+                </div>
+                ${o.quote ? `<div class="req-price"><span class="big">${money(o.quote.total)}</span><small>≈ ${leiOf(o.quote.total)} lei · ${o.quote.sqm} m² · ${esc(o.quote.date || "")} ${esc(o.quote.startTime || "")}${o.quote.linens ? ` · ${o.quote.linenSets} lenj.` : ""}</small></div>` : ""}
+              </div>
+              ${o.note ? `<div class="req-notes">📝 ${esc(o.note)}</div>` : ""}
+            </div>`).join("")}</div>
+        </div>`;
+      })()}
       <div class="card" style="margin-top:16px">
         <div class="section-title" style="margin-top:0">Model de plată</div>
-        <div class="row-2" style="max-width:520px">
+        <div class="row-2" style="max-width:640px">
+          <div class="field" style="margin-bottom:0">
+            <label>Preț de bază curățenie (€/m²)</label>
+            <div style="display:flex;gap:10px">
+              <input type="number" id="priceInput" min="0.1" step="0.05" value="${S.pricePerSqm()}" style="max-width:110px"/>
+              <button class="btn btn-sm" id="savePrice">Salvează</button>
+            </div>
+            <div class="hint">Preț de bază (off-peak). Vârf (10–15) = +${C.schedule.peakSurchargePct}%. Se aplică live pe home, simulator și solicitări.</div>
+          </div>
           <div class="field" style="margin-bottom:0">
             <label>Comision reținut de platformă (%)</label>
             <div style="display:flex;gap:10px">
@@ -3276,7 +3448,7 @@ body.landing-active { background: var(--h-bg); }
             </div>
           </div>
         </div>
-        <div class="hint" style="margin-top:10px">Clientul plătește: curățenie 1 €/m² (cu reducerea de interval) + lenjerie ${C.linenSetPriceRon} lei/set (≈ ${money(S.ronToEur(C.linenSetPriceRon))}/set). Platforma reține ${s.commissionPct}%. Partea de lenjerie merge la Agent Cleaning dacă el o spală &amp; calcă; altfel rămâne la platformă (spălătorie).</div>
+        <div class="hint" style="margin-top:10px">Clientul plătește: curățenie ${S.pricePerSqm()} €/m² (cu reducerea de interval) + lenjerie ${C.linenSetPriceRon} lei/set (≈ ${money(S.ronToEur(C.linenSetPriceRon))}/set). Platforma reține ${s.commissionPct}%. Partea de lenjerie merge la Agent Cleaning dacă el o spală &amp; calcă; altfel rămâne la platformă (spălătorie).</div>
         <div class="divider"></div>
         <div class="section-title" style="margin-top:0">O lenjerie (set) conține</div>
         <div style="display:flex;flex-wrap:wrap;gap:8px">${C.linenComposition.map(x => `<span class="pill">${x}</span>`).join("")}</div>
@@ -3287,6 +3459,10 @@ body.landing-active { background: var(--h-bg); }
         <button class="btn btn-danger btn-sm" id="resetBtn">Resetează datele demo</button>
       </div>
     `));
+    $("#savePrice").onclick = () => {
+      const v = S.setPricePerSqm($("#priceInput").value);
+      toast("Preț de bază setat la " + v + " €/m².", "ok"); renderAdmin(S.currentUser());
+    };
     $("#saveComm").onclick = () => {
       const v = S.setCommissionPct($("#commInput").value);
       toast("Comision setat la " + v + "%.", "ok"); renderAdmin(S.currentUser());
@@ -3492,13 +3668,13 @@ body.landing-active { background: var(--h-bg); }
               ${showFullAddress && r.mapsUrl ? `<span>${mapsLink(r.mapsUrl)}</span>` : ""}
               <span>📅 ${esc(r.date)} · ${esc(r.startTime || r.time || "")}${r.endTime ? "–" + esc(r.endTime) : ""}</span>
               <span>🛏️ ${r.linens ? r.linenSets + " set lenjerie" : "fără lenjerie (proprie)"}</span>
-              ${b.discPct ? `<span class="pill">−${b.discPct}% interval</span>` : ""}
+              ${b.peakPct ? `<span class="pill" style="border-color:var(--warn);color:var(--warn)">+${b.peakPct}% vârf</span>` : ""}
               ${b.surPct ? `<span class="pill" style="border-color:var(--warn);color:var(--warn)">+${b.surPct}% weekend/sărbătoare</span>` : ""}
             </div>
           </div>
           <div class="req-price">
             <span class="big">${money(p.total)}</span>
-            <small>${money(p.cleaningNet)} curățenie${p.linenIncluded && p.linenSets > 0 ? " + " + money(p.linenEur) + " lenjerie" : ""}</small>
+            <small>≈ ${leiOf(p.total)} lei · ${money(p.cleaningNet)} curățenie${p.linenIncluded && p.linenSets > 0 ? " + " + money(p.linenEur) + " lenjerie" : ""}</small>
           </div>
         </div>
         ${r.readyNotified ? `<div class="ready-banner">🎉 Locația este gata pentru oaspeți!${cleaner ? ` Anunțat de <strong>${esc(cleaner.name)}</strong>` : ""}${r.readyAt ? ` · ${fmtWhen(r.readyAt)}` : ""}</div>` : ""}
@@ -3565,10 +3741,387 @@ body.landing-active { background: var(--h-bg); }
     return el(`<div class="empty card"><span class="ico">📭</span><h3 style="margin:0 0 6px">${esc(title)}</h3><p style="margin:0">${esc(sub)}</p></div>`);
   }
 
+  /* ============ i18n — română (default) + nepaleză (नेपाली) ============ */
+  let LANG = (() => { try { return localStorage.getItem("sgc_lang") || "ro"; } catch (e) { return "ro"; } })();
+  let _langInited = false;
+
+  // Dicționar ro -> nepaleză. Termenii de brand (Sleep & Go, Agent Cleaning) rămân.
+  const NE_DICT = {
+    // Autentificare & cont
+    "Intră în cont": "लगइन गर्नुहोस्", "Creează cont": "खाता खोल्नुहोस्", "Am deja cont": "मेरो खाता छ",
+    "Autentificare": "लगइन", "Ieșire": "बाहिर निस्कनुहोस्", "Deconectare": "लगआउट",
+    "Email": "इमेल", "Parolă": "पासवर्ड", "Sunt...": "म हुँ...", "Nume complet": "पूरा नाम",
+    "Nume reprezentant": "प्रतिनिधिको नाम", "Te contactăm în curând.": "हामी चाँडै सम्पर्क गर्नेछौं।",
+    "Bine ai revenit!": "फेरि स्वागत छ!", "Cont creat cu succes!": "खाता सफलतापूर्वक खोलियो!",
+    // Roluri
+    "Solicitant": "अनुरोधकर्ता", "Serviciu lenjerie": "बेडसिट सेवा", "Administrator": "प्रशासक",
+    "vreau curățenie": "मलाई सफाइ चाहिन्छ", "ofer curățenie": "म सफाइ प्रदान गर्छु", "spăl lenjeria": "म बेडसिट धुन्छु",
+    // Navigație / butoane comune
+    "Servicii": "सेवाहरू", "Prețuri": "मूल्यहरू", "Închiriere lenjerii": "बेडसिट भाडा",
+    "Acasă": "गृह", "← Acasă": "← गृह", "Cum funcționează": "कसरी काम गर्छ", "Cum începi": "कसरी सुरु गर्ने",
+    "Cât câștigi": "कति कमाउनुहुन्छ", "Începe acum": "अहिले सुरु गर्नुहोस्", "Înscrie-te": "दर्ता गर्नुहोस्",
+    "Trimite": "पठाउनुहोस्", "Salvează": "सुरक्षित गर्नुहोस्", "Renunță": "रद्द गर्नुहोस्", "Închide": "बन्द गर्नुहोस्",
+    "Anulează": "रद्द गर्नुहोस्", "Confirmă": "पुष्टि गर्नुहोस्", "Vezi": "हेर्नुहोस्", "Editează": "सम्पादन",
+    // Home landing
+    "Ce oferim": "हामी के प्रदान गर्छौं", "Servicii pentru regim hotelier": "होटेल शैलीका सेवाहरू",
+    "Pentru cine": "कसका लागि", "O platformă, patru roluri": "एउटै प्लेटफर्म, चार भूमिका",
+    "Simplu în 3 pași": "३ चरणमा सजिलो", "Verifică zona de activitate": "क्षेत्र जाँच गर्नुहोस्",
+    "zone deservite": "सेवा दिइएका क्षेत्रहरू", "program zilnic": "दैनिक समय", "în afara orelor de vârf": "व्यस्त समय बाहिर",
+    "Curățenie regim hotelier": "होटेल शैली सफाइ", "Alimentare consumabile": "उपभोग्य वस्तु आपूर्ति",
+    // Solicitant — taburi & formular
+    "Solicitare nouă": "नयाँ अनुरोध", "Locațiile mele": "मेरा स्थानहरू", "Solicitările mele": "मेरा अनुरोधहरू",
+    "Locație (aprobată)": "स्थान (स्वीकृत)", "Data dorită": "चाहिएको मिति",
+    "Ora început": "सुरु समय", "Ora sfârșit": "अन्त्य समय", "Lenjerie": "बेडसिट",
+    "Cu lenjerie": "बेडसिटसहित", "Fără lenjerie": "बेडसिट बिना", "folosesc lenjeria mea": "म आफ्नै बेडसिट प्रयोग गर्छु",
+    "Câte lenjerii (seturi)": "कति बेडसिट (सेट)", "Alimentare consumabile (opțional)": "उपभोग्य वस्तु (वैकल्पिक)",
+    "Rezumat cost": "लागत सारांश", "Total de plată": "कुल भुक्तानी", "Total în avans": "अग्रिम कुल",
+    "Curățenie": "सफाइ", "Consumabile": "उपभोग्य वस्तु", "Interval de vârf": "व्यस्त समय", "preț întreg": "पूरा मूल्य",
+    "Trimite solicitarea": "अनुरोध पठाउनुहोस्", "Plătește": "भुक्तानी गर्नुहोस्", "Plătită": "भुक्तानी भयो",
+    // Locații
+    "Adaugă locație": "स्थान थप्नुहोस्", "Adresa exactă": "ठ्याक्कै ठेगाना", "Link Google Maps": "Google Maps लिंक",
+    "Suprafață declarată (m²)": "घोषित क्षेत्रफल (m²)", "Trimite spre aprobare": "स्वीकृतिका लागि पठाउनुहोस्",
+    "În așteptare aprobare": "स्वीकृति पर्खँदै", "Aprobată": "स्वीकृत", "Respinsă": "अस्वीकृत", "Aprobă": "स्वीकृत गर्नुहोस्", "Respinge": "अस्वीकृत गर्नुहोस्",
+    // Statusuri
+    "Așteaptă plata": "भुक्तानी पर्खँदै", "Plătită · disponibilă": "भुक्तानी · उपलब्ध", "Acceptată": "स्वीकृत",
+    "În lucru": "काम भइरहेको", "Finalizată": "सम्पन्न", "Anulată": "रद्द भयो",
+    // Diverse frecvente
+    "Nume": "नाम", "Telefon": "फोन", "Mesaj (opțional)": "सन्देश (वैकल्पिक)", "Email (opțional)": "इमेल (वैकल्पिक)",
+    "obligatoriu": "अनिवार्य", "opțional": "वैकल्पिक", "Salut": "नमस्ते",
+
+    // ---- Etapa 2: panouri, taburi, butoane, mesaje ----
+    // Taburi (prefixe, numărătorul se păstrează automat)
+    "➕ Solicitare nouă": "➕ नयाँ अनुरोध", "📋 Solicitările mele": "📋 मेरा अनुरोधहरू",
+    "🧹 Lucrările mele": "🧹 मेरा कामहरू", "📍 Disponibile în zonă": "📍 क्षेत्रमा उपलब्ध",
+    "⏱️ Activitatea mea": "⏱️ मेरो गतिविधि", "📦 Stocul meu": "📦 मेरो स्टक",
+    "📊 Ansamblu": "📊 सारांश", "📍 Locații": "📍 स्थानहरू", "🛒 Produse": "🛒 उत्पादनहरू",
+    "📦 Stoc executanți": "📦 Agent स्टक", "🛏️ Lenjerie": "🛏️ बेडसिट", "🧾 Solicitări": "🧾 अनुरोधहरू",
+    "⏱️ Pontaj": "⏱️ समय अभिलेख", "👥 Utilizatori": "👥 प्रयोगकर्ताहरू",
+    "🧺 Lenjerie disponibilă": "🧺 उपलब्ध बेडसिट", "🧺 Lucrările mele (lenjerie)": "🧺 मेरा कामहरू (बेडसिट)",
+    // Panouri / titluri
+    "Panou Agent Cleaning": "Agent Cleaning प्यानल", "Panou administrare": "प्रशासन प्यानल",
+    "Profilul meu": "मेरो प्रोफाइल", "Stocul meu de consumabile": "मेरो उपभोग्य वस्तु स्टक",
+    "Pontaj — început / terminat": "समय अभिलेख — सुरु / अन्त्य", "Toate sesiunile": "सबै सत्रहरू",
+    "Rezumat pe Agent Cleaning": "Agent Cleaning अनुसार सारांश", "Condiții de înscriere": "दर्ता सर्तहरू",
+    "Model de plată": "भुक्तानी नमुना", "Rezumat cost": "लागत सारांश",
+    // Butoane / acțiuni
+    "Începe lucrul": "काम सुरु गर्नुहोस्", "🔔 Anunță: locația e gata pentru oaspeți": "🔔 सूचना: स्थान पाहुनाका लागि तयार छ",
+    "✋ Înscrie-mă la această solicitare": "✋ यो अनुरोधमा दर्ता गर्नुहोस्", "Retrage": "फिर्ता लिनुहोस्",
+    "Alege": "छान्नुहोस्", "Nu preiau lenjeria": "म बेडसिट लिन्न", "Lenjerie gata (adusă)": "बेडसिट तयार (ल्याइयो)",
+    "🧺 Lenjerie gata": "🧺 बेडसिट तयार", "Confirmă · trimite la spălătorie": "पुष्टि · बेडसिट सेवामा पठाउनुहोस्",
+    "Adaugă o locație": "स्थान थप्नुहोस्", "Adaugi locația": "स्थान थप्नुहोस्", "Adaugă produs": "उत्पादन थप्नुहोस्",
+    "Adaugă în catalog": "क्याटलगमा थप्नुहोस्", "Livrează +10": "+10 डेलिभर गर्नुहोस्", "Reaprovizionează": "पुनः भर्नुहोस्",
+    "Resetează datele demo": "डेमो डाटा रिसेट गर्नुहोस्", "Schimbă zona de activitate": "गतिविधि क्षेत्र परिवर्तन गर्नुहोस्",
+    "Trimite evaluarea": "मूल्याङ्कन पठाउनुहोस्", "Trimite spre aprobare": "स्वीकृतिका लागि पठाउनुहोस्",
+    "Trimite înregistrarea": "दर्ता पठाउनुहोस्", "Înregistrează-te": "दर्ता गर्नुहोस्",
+    "Înscrie-te ca Agent Cleaning": "Agent Cleaning का रूपमा दर्ता गर्नुहोस्", "Devino serviciu de lenjerie": "बेडसिट सेवा बन्नुहोस्",
+    "Continuă spre plată →": "भुक्तानीतिर जानुहोस् →", "Șterge poza": "फोटो हटाउनुहोस्", "Retrage": "फिर्ता लिनुहोस्",
+    // Formulare / etichete
+    "Date firmă (obligatoriu)": "कम्पनी विवरण (अनिवार्य)", "Formă de organizare": "संगठनको प्रकार",
+    "Denumire firmă": "कम्पनीको नाम", "Denumire": "नाम", "Unitate": "एकाइ", "Preț de achiziție (lei)": "खरिद मूल्य (lei)",
+    "Alertă stoc la (buc)": "स्टक अलर्ट (थान)", "Zona / Localitatea": "क्षेत्र / सहर", "Zona în care activez": "म काम गर्ने क्षेत्र",
+    "Telefon contact": "सम्पर्क फोन", "Adresă / sediu": "ठेगाना / कार्यालय", "Observații (opțional)": "टिप्पणी (वैकल्पिक)",
+    "Instrucțiuni acces (opțional)": "पहुँच निर्देशन (वैकल्पिक)", "Document dimensiune (plan, schiță, act cadastral)": "क्षेत्रफल कागजात (योजना, नक्सा)",
+    "🔑 Detalii check-in (obligatoriu)": "🔑 चेक-इन विवरण (अनिवार्य)", "Cod interfon": "इन्टरफोन कोड",
+    "Cod lockbox / yală electrică": "लकबक्स / इलेक्ट्रोनिक ताल्चा कोड", "Nume pe card": "कार्डमा नाम", "Informații card": "कार्ड जानकारी",
+    "De unde se ridică lenjeria?": "बेडसिट कहाँबाट लिने?", "Adresa de ridicare": "उठाउने ठेगाना",
+    "Nr. lenjerii": "बेडसिट संख्या", "Comision reținut de platformă (%)": "प्लेटफर्म कमिसन (%)",
+    "Curs RON → EUR (1 € = ? lei)": "RON → EUR दर (1 € = ? lei)", "Alimentare consumabile (opțional)": "उपभोग्य वस्तु (वैकल्पिक)",
+    // Condiții / recrutare
+    "Entitate juridică": "कानुनी संस्था", "O zonă de activitate": "एक गतिविधि क्षेत्र", "Seriozitate": "गम्भीरता",
+    "Spațiu de depozitare": "भण्डारण ठाउँ", "Buget pentru consumabile": "उपभोग्य वस्तुका लागि बजेट", "Garanție": "ग्यारेन्टी",
+    "Punctualitate": "समयनिष्ठता", "Mașină pentru livrări": "डेलिभरीका लागि सवारी",
+    "Un venit stabil, pe termenii tăi": "स्थिर आम्दानी, तपाईंकै सर्तमा", "Mai multe surse de venit": "आम्दानीका धेरै स्रोत",
+    "Câștigi doar din spălare și consumabile": "तपाईं धुलाइ र उपभोग्य वस्तुबाट मात्र कमाउनुहुन्छ",
+    "Venit din spălare și distribuție de consumabile": "धुलाइ र उपभोग्य वितरणबाट आम्दानी",
+    // Circuit lenjerie / stoc / admin
+    "Primite de la proprietar": "मालिकबाट प्राप्त", "🏠 În locație": "🏠 स्थानमा", "🧺 La spălătorie": "🧺 धुलाइमा",
+    "📦 La Agent Cleaning": "📦 Agent Cleaning सँग", "Utilizatori": "प्रयोगकर्ताहरू",
+    // Mesaje (toast) frecvente
+    "Te-ai deconectat.": "तपाईं लगआउट हुनुभयो।", "Zonă actualizată.": "क्षेत्र अद्यावधिक भयो।", "Date resetate.": "डाटा रिसेट भयो।",
+    "Locație aprobată.": "स्थान स्वीकृत भयो।", "Locație respinsă.": "स्थान अस्वीकृत भयो।", "Produs adăugat.": "उत्पादन थपियो।",
+    "Solicitare anulată.": "अनुरोध रद्द भयो।", "Mulțumim pentru evaluare!": "मूल्याङ्कनका लागि धन्यवाद!",
+    "Poză de profil salvată.": "प्रोफाइल फोटो सुरक्षित भयो।", "Poză ștearsă.": "फोटो हटाइयो।",
+    "Circuit lenjerie actualizat.": "बेडसिट सर्किट अद्यावधिक भयो।", "Lenjerie finalizată. Plata se eliberează.": "बेडसिट सम्पन्न। भुक्तानी जारी हुन्छ।",
+    "Lenjeria a fost trimisă către Serviciul de lenjerie.": "बेडसिट, बेडसिट सेवामा पठाइयो।", "Lenjeria nu mai este disponibilă.": "बेडसिट अब उपलब्ध छैन।",
+    "Te-ai înscris! Solicitantul te poate alege.": "तपाईं दर्ता हुनुभयो! अनुरोधकर्ताले तपाईंलाई छान्न सक्छ।",
+    "Ți-ai retras înscrierea.": "तपाईंले दर्ता फिर्ता लिनुभयो।", "Ai început lucrul — cronometrul pornește.": "काम सुरु भयो — घडी चल्यो।",
+    "Ai anunțat clientul: locația e gata pentru oaspeți!": "ग्राहकलाई सूचित गरियो: स्थान पाहुनाका लागि तयार छ!",
+    "Ai preluat lenjeria la spălat (+plată).": "तपाईंले धुनका लागि बेडसिट लिनुभयो (+भुक्तानी)।",
+    "Completează adresa de ridicare.": "उठाउने ठेगाना भर्नुहोस्।", "Alege numărul de stele.": "ताराको संख्या छान्नुहोस्।",
+    "Atașează documentul de suprafață.": "क्षेत्रफल कागजात संलग्न गर्नुहोस्।",
+  };
+
+  // Dicționar ro -> engleză
+  const EN_DICT = {
+    "Intră în cont": "Log in", "Creează cont": "Create account", "Am deja cont": "I already have an account",
+    "Autentificare": "Log in", "Ieșire": "Log out", "Deconectare": "Log out",
+    "Email": "Email", "Parolă": "Password", "Sunt...": "I am...", "Nume complet": "Full name",
+    "Nume reprezentant": "Representative name", "Te contactăm în curând.": "We'll contact you soon.",
+    "Bine ai revenit!": "Welcome back!", "Cont creat cu succes!": "Account created successfully!",
+    "Solicitant": "Client", "Serviciu lenjerie": "Linen service", "Administrator": "Administrator",
+    "vreau curățenie": "I want cleaning", "ofer curățenie": "I offer cleaning", "spăl lenjeria": "I wash linen",
+    "Servicii": "Services", "Prețuri": "Pricing", "Închiriere lenjerii": "Linen rental",
+    "Acasă": "Home", "← Acasă": "← Home", "Cum funcționează": "How it works", "Cum începi": "How to start",
+    "Cât câștigi": "How much you earn", "Începe acum": "Start now", "Înscrie-te": "Sign up",
+    "Trimite": "Send", "Salvează": "Save", "Renunță": "Cancel", "Închide": "Close",
+    "Anulează": "Cancel", "Confirmă": "Confirm", "Vezi": "View", "Editează": "Edit",
+    "Ce oferim": "What we offer", "Servicii pentru regim hotelier": "Hotel-regime services",
+    "Pentru cine": "For whom", "O platformă, patru roluri": "One platform, four roles",
+    "Simplu în 3 pași": "Simple, in 3 steps", "Verifică zona de activitate": "Check the service area",
+    "zone deservite": "areas served", "program zilnic": "daily hours", "în afara orelor de vârf": "off-peak hours",
+    "Curățenie regim hotelier": "Hotel-regime cleaning", "Alimentare consumabile": "Consumables supply",
+    "Solicitare nouă": "New request", "Locațiile mele": "My locations", "Solicitările mele": "My requests",
+    "Locație (aprobată)": "Location (approved)", "Data dorită": "Desired date",
+    "Ora început": "Start time", "Ora sfârșit": "End time", "Lenjerie": "Linen",
+    "Cu lenjerie": "With linen", "Fără lenjerie": "Without linen", "folosesc lenjeria mea": "I use my own linen",
+    "Câte lenjerii (seturi)": "How many linen sets", "Alimentare consumabile (opțional)": "Consumables (optional)",
+    "Rezumat cost": "Cost summary", "Total de plată": "Total to pay", "Total în avans": "Total in advance",
+    "Curățenie": "Cleaning", "Consumabile": "Consumables", "Interval de vârf": "Peak hours", "preț întreg": "full price",
+    "Trimite solicitarea": "Send request", "Plătește": "Pay", "Plătită": "Paid",
+    "Adaugă locație": "Add location", "Adresa exactă": "Exact address", "Link Google Maps": "Google Maps link",
+    "Suprafață declarată (m²)": "Declared area (m²)", "Trimite spre aprobare": "Submit for approval",
+    "În așteptare aprobare": "Awaiting approval", "Aprobată": "Approved", "Respinsă": "Rejected", "Aprobă": "Approve", "Respinge": "Reject",
+    "Așteaptă plata": "Awaiting payment", "Plătită · disponibilă": "Paid · available", "Acceptată": "Accepted",
+    "În lucru": "In progress", "Finalizată": "Completed", "Anulată": "Cancelled",
+    "Nume": "Name", "Telefon": "Phone", "Mesaj (opțional)": "Message (optional)", "Email (opțional)": "Email (optional)",
+    "obligatoriu": "required", "opțional": "optional", "Salut": "Hi",
+    // Etapa 2
+    "➕ Solicitare nouă": "➕ New request", "📋 Solicitările mele": "📋 My requests",
+    "🧹 Lucrările mele": "🧹 My jobs", "📍 Disponibile în zonă": "📍 Available in your area",
+    "⏱️ Activitatea mea": "⏱️ My activity", "📦 Stocul meu": "📦 My stock",
+    "📊 Ansamblu": "📊 Overview", "📍 Locații": "📍 Locations", "🛒 Produse": "🛒 Products",
+    "📦 Stoc executanți": "📦 Agent stock", "🛏️ Lenjerie": "🛏️ Linen", "🧾 Solicitări": "🧾 Requests",
+    "⏱️ Pontaj": "⏱️ Time log", "👥 Utilizatori": "👥 Users",
+    "🧺 Lenjerie disponibilă": "🧺 Available linen", "🧺 Lucrările mele (lenjerie)": "🧺 My jobs (linen)",
+    "Panou Agent Cleaning": "Agent Cleaning panel", "Panou administrare": "Admin panel",
+    "Profilul meu": "My profile", "Stocul meu de consumabile": "My consumables stock",
+    "Pontaj — început / terminat": "Time log — start / end", "Toate sesiunile": "All sessions",
+    "Rezumat pe Agent Cleaning": "Summary per Agent Cleaning", "Condiții de înscriere": "Registration requirements",
+    "Model de plată": "Payment model",
+    "Începe lucrul": "Start work", "🔔 Anunță: locația e gata pentru oaspeți": "🔔 Notify: location ready for guests",
+    "✋ Înscrie-mă la această solicitare": "✋ Apply to this request", "Retrage": "Withdraw",
+    "Alege": "Choose", "Nu preiau lenjeria": "I won't take the linen", "Lenjerie gata (adusă)": "Linen ready (delivered)",
+    "🧺 Lenjerie gata": "🧺 Linen ready", "Confirmă · trimite la spălătorie": "Confirm · send to laundry",
+    "Adaugă o locație": "Add a location", "Adaugi locația": "Add location", "Adaugă produs": "Add product",
+    "Adaugă în catalog": "Add to catalog", "Livrează +10": "Deliver +10", "Reaprovizionează": "Restock",
+    "Resetează datele demo": "Reset demo data", "Schimbă zona de activitate": "Change activity area",
+    "Trimite evaluarea": "Send review", "Trimite înregistrarea": "Send registration", "Înregistrează-te": "Register",
+    "Înscrie-te ca Agent Cleaning": "Register as Agent Cleaning", "Devino serviciu de lenjerie": "Become a linen service",
+    "Continuă spre plată →": "Continue to payment →", "Șterge poza": "Delete photo",
+    "Date firmă (obligatoriu)": "Company details (required)", "Formă de organizare": "Legal form",
+    "Denumire firmă": "Company name", "Denumire": "Name", "Unitate": "Unit", "Preț de achiziție (lei)": "Purchase price (lei)",
+    "Alertă stoc la (buc)": "Stock alert at (pcs)", "Zona / Localitatea": "Area / City", "Zona în care activez": "My activity area",
+    "Telefon contact": "Contact phone", "Adresă / sediu": "Address / office", "Observații (opțional)": "Notes (optional)",
+    "Instrucțiuni acces (opțional)": "Access instructions (optional)", "Document dimensiune (plan, schiță, act cadastral)": "Area document (plan, sketch)",
+    "🔑 Detalii check-in (obligatoriu)": "🔑 Check-in details (required)", "Cod interfon": "Intercom code",
+    "Cod lockbox / yală electrică": "Lockbox / e-lock code", "Nume pe card": "Name on card", "Informații card": "Card details",
+    "De unde se ridică lenjeria?": "Where is the linen picked up?", "Adresa de ridicare": "Pickup address",
+    "Nr. lenjerii": "Number of linens", "Comision reținut de platformă (%)": "Platform commission (%)",
+    "Curs RON → EUR (1 € = ? lei)": "RON → EUR rate (1 € = ? lei)",
+    "Entitate juridică": "Legal entity", "O zonă de activitate": "An activity area", "Seriozitate": "Reliability",
+    "Spațiu de depozitare": "Storage space", "Buget pentru consumabile": "Budget for consumables", "Garanție": "Guarantee",
+    "Punctualitate": "Punctuality", "Mașină pentru livrări": "Vehicle for deliveries",
+    "Un venit stabil, pe termenii tăi": "A steady income, on your terms", "Mai multe surse de venit": "Multiple income sources",
+    "Câștigi doar din spălare și consumabile": "You earn only from washing and consumables",
+    "Venit din spălare și distribuție de consumabile": "Income from washing and consumables distribution",
+    "Primite de la proprietar": "Received from owner", "🏠 În locație": "🏠 At location", "🧺 La spălătorie": "🧺 At laundry",
+    "📦 La Agent Cleaning": "📦 At Agent Cleaning", "Utilizatori": "Users",
+    "Te-ai deconectat.": "You logged out.", "Zonă actualizată.": "Area updated.", "Date resetate.": "Data reset.",
+    "Locație aprobată.": "Location approved.", "Locație respinsă.": "Location rejected.", "Produs adăugat.": "Product added.",
+    "Solicitare anulată.": "Request cancelled.", "Mulțumim pentru evaluare!": "Thanks for your review!",
+    "Poză de profil salvată.": "Profile photo saved.", "Poză ștearsă.": "Photo deleted.",
+    "Circuit lenjerie actualizat.": "Linen circuit updated.", "Lenjerie finalizată. Plata se eliberează.": "Linen completed. Payment released.",
+    "Lenjeria a fost trimisă către Serviciul de lenjerie.": "The linen was sent to the Linen service.", "Lenjeria nu mai este disponibilă.": "The linen is no longer available.",
+    "Te-ai înscris! Solicitantul te poate alege.": "You applied! The client can choose you.",
+    "Ți-ai retras înscrierea.": "You withdrew your application.", "Ai început lucrul — cronometrul pornește.": "You started work — the timer is running.",
+    "Ai anunțat clientul: locația e gata pentru oaspeți!": "You notified the client: location ready for guests!",
+    "Ai preluat lenjeria la spălat (+plată).": "You took the linen for washing (+payment).",
+    "Completează adresa de ridicare.": "Fill in the pickup address.", "Alege numărul de stele.": "Choose the number of stars.",
+    "Atașează documentul de suprafață.": "Attach the area document.",
+  };
+
+  const DICTS = { ne: NE_DICT, en: EN_DICT };
+
+  // Texte complete pagina principală: [ro, en, ne] → alimentează ambele dicționare.
+  [
+    ["✓ Regim hotelier", "✓ Hotel regime", "✓ होटेल शैली"],
+    ["✓ Plată în avans securizată", "✓ Secure advance payment", "✓ सुरक्षित अग्रिम भुक्तानी"],
+    ["✓ Agenți Cleaning verificați (PFA/PFI/SRL)", "✓ Verified Cleaning Agents (PFA/PFI/SRL)", "✓ प्रमाणित Cleaning Agent (PFA/PFI/SRL)"],
+    ["Specializați în curățenie regim hotelier", "Specialists in hotel-regime cleaning", "होटेल शैली सफाइमा विशेषज्ञ"],
+    ["Curățenie de regim hotelier,", "Hotel-regime cleaning,", "होटेल शैली सफाइ,"],
+    ["la o apăsare de buton", "at the press of a button", "एक बटन थिचेर"],
+    ["Proprietari de închirieri pe termen scurt: adaugă-ți locația, alege data și intervalul, plătește în avans. Agenții Cleaning din zona ta se înscriu, iar", "Short-term rental owners: add your location, pick the date and time slot, pay in advance. Cleaning Agents in your area apply, and", "छोटो अवधि भाडाका मालिकहरू: आफ्नो स्थान थप्नुहोस्, मिति र समय छान्नुहोस्, अग्रिम भुक्तानी गर्नुहोस्। तपाईंको क्षेत्रका Cleaning Agent दर्ता हुन्छन्, र"],
+    ["tu alegi", "you choose", "तपाईं छान्नुहुन्छ"],
+    ["pe cel dorit — după rating și recenzii.", "the one you want — by rating and reviews.", "मनपर्नेलाई — रेटिङ र समीक्षाका आधारमा।"],
+    ["de la 0.8 €", "from 0.8 €", "0.8 € देखि"],
+    ["📍 București · Sector 3", "📍 Bucharest · District 3", "📍 बुखारेस्ट · सेक्टर 3"],
+    ["Curățenie · 55 m²", "Cleaning · 55 m²", "सफाइ · 55 m²"],
+    ["📅 Vineri · 10:00–14:00", "📅 Friday · 10:00–14:00", "📅 शुक्रबार · 10:00–14:00"],
+    ["🛏️ 2 seturi lenjerie", "🛏️ 2 linen sets", "🛏️ 2 बेडसिट सेट"],
+    ["🧴 3 consumabile", "🧴 3 consumables", "🧴 3 उपभोग्य वस्तु"],
+    ["🧻 Hârtie igienică", "🧻 Toilet paper", "🧻 शौचालय कागज"],
+    ["💧 Apă (bax 6×2L)", "💧 Water (6×2L)", "💧 पानी (6×2L)"],
+    ["☕ Cafea", "☕ Coffee", "☕ कफी"],
+    ["Curățenie (55 m²)", "Cleaning (55 m²)", "सफाइ (55 m²)"],
+    ["Lenjerie (2 × 50 lei)", "Linen (2 × 50 lei)", "बेडसिट (2 × 50 lei)"],
+    ["Consumabile (70 lei + 10%)", "Consumables (70 lei + 10%)", "उपभोग्य (70 lei + 10%)"],
+    ["Agent Cleaning · Sector 3", "Agent Cleaning · District 3", "Agent Cleaning · सेक्टर 3"],
+    ["🧹 Preluată de Agent Cleaning", "🧹 Taken by Agent Cleaning", "🧹 Agent Cleaning ले लियो"],
+    ["De la adăugarea locației până la o locație gata de oaspeți.", "From adding the location to a guest-ready home.", "स्थान थप्नेदेखि पाहुनाका लागि तयार स्थानसम्म।"],
+    ["Adaugi locația", "You add the location", "स्थान थप्नुहोस्"],
+    ["Încarci un document cu suprafața exactă. Administratorul o validează, ca prețul să fie corect.", "You upload a document with the exact area. The administrator validates it so the price is correct.", "तपाईं ठ्याक्कै क्षेत्रफल भएको कागजात अपलोड गर्नुहुन्छ। मूल्य सही होस् भनेर प्रशासकले प्रमाणित गर्छ।"],
+    ["Programezi & plătești", "Schedule & pay", "तालिका र भुक्तानी"],
+    ["Alegi data, intervalul orar (8:00–19:00) și lenjeria. Vezi prețul dinamic și plătești în avans prin Stripe.", "You pick the date, the time slot (8:00–19:00) and the linen. You see the dynamic price and pay in advance via Stripe.", "तपाईं मिति, समय (8:00–19:00) र बेडसिट छान्नुहुन्छ। गतिशील मूल्य हेरेर Stripe मार्फत अग्रिम भुक्तानी गर्नुहुन्छ।"],
+    ["Alegi Agentul Cleaning", "You choose the Agent Cleaning", "Agent Cleaning छान्नुहोस्"],
+    ["Agenții Cleaning din zona ta se înscriu la solicitarea ta. Tu îl alegi pe cel dorit — după rating și recenzii — iar el pregătește locația.", "Cleaning Agents in your area apply to your request. You choose the one you want — by rating and reviews — and they prepare the home.", "तपाईंको क्षेत्रका Cleaning Agent तपाईंको अनुरोधमा दर्ता हुन्छन्। तपाईं मनपर्नेलाई छान्नुहुन्छ — रेटिङ र समीक्षाका आधारमा — र उसले स्थान तयार गर्छ।"],
+    ["Colaborarea începe cu digitalizarea lenjeriilor", "Collaboration starts with digitizing the linens", "सहकार्य बेडसिट डिजिटलीकरणबाट सुरु हुन्छ"],
+    ["Tot ce ține de întreținerea unei locații de închiriat pe termen scurt, într-un singur loc.", "Everything about maintaining a short-term rental, in one place.", "छोटो अवधि भाडा स्थानको मर्मतसम्भारसम्बन्धी सबै कुरा, एकै ठाउँमा।"],
+    ["Turnover complet între check-out și check-in: curățenie, schimbat lenjeria, pregătit locația pentru următorii oaspeți.", "Full turnover between check-out and check-in: cleaning, changing the linen, preparing the home for the next guests.", "चेक-आउट र चेक-इन बीच पूर्ण टर्नओभर: सफाइ, बेडसिट फेर्ने, अर्को पाहुनाका लागि स्थान तयार पार्ने।"],
+    ["Hârtie igienică, apă, cafea, bomboane și produse de curățenie — reaprovizionare la fiecare intervenție.", "Toilet paper, water, coffee, sweets and cleaning products — restocked at every visit.", "शौचालय कागज, पानी, कफी, मिठाई र सफाइ सामग्री — हरेक पटक पुनः भरिन्छ।"],
+    ["Indici de consum", "Utility readings", "उपभोग रिडिङ"],
+    ["Citim și transmitem indicii de apă, curent și gaz către furnizori, pe bază de cerere standard.", "We read and report water, electricity and gas readings to providers, on standard request.", "हामी पानी, बिजुली र ग्यास रिडिङ पढेर आपूर्तिकर्तालाई पठाउँछौं।"],
+    ["Proprietar de locație în regim hotelier.", "Owner of a hotel-regime property.", "होटेल शैली सम्पत्तिको मालिक।"],
+    ["Adaugă locații cu document de suprafață", "Adds locations with an area document", "क्षेत्रफल कागजातसहित स्थान थप्छ"],
+    ["Programează curățenii și plătește în avans", "Schedules cleanings and pays in advance", "सफाइ तालिका बनाएर अग्रिम भुक्तानी गर्छ"],
+    ["Alege Agentul Cleaning dintre cei înscriși", "Chooses the Agent Cleaning from the applicants", "दर्ता भएकाहरूबाट Agent Cleaning छान्छ"],
+    ["PFA / PFI / SRL, activ pe zona ta.", "PFA / PFI / SRL, active in your area.", "PFA / PFI / SRL, तपाईंको क्षेत्रमा सक्रिय।"],
+    ["Preiei solicitările din zona ta", "You take requests in your area", "तपाईं आफ्नो क्षेत्रका अनुरोध लिनुहुन्छ"],
+    ["Decizi dacă speli și lenjeria", "You decide whether to wash the linen too", "बेडसिट पनि धुने कि नधुने तपाईं निर्णय गर्नुहुन्छ"],
+    ["Încasezi după finalizare (comision 30%)", "You get paid after completion (30% commission)", "सम्पन्न पछि भुक्तानी पाउनुहुन्छ (30% कमिसन)"],
+    ["Preia lenjeria când Agentul Cleaning nu poate.", "Takes the linen when the Agent Cleaning can't.", "Agent Cleaning ले नसक्दा बेडसिट लिन्छ।"],
+    ["Iei lenjeria refuzată din zona ta", "You take the declined linen in your area", "तपाईं आफ्नो क्षेत्रको अस्वीकृत बेडसिट लिनुहुन्छ"],
+    ["O speli, o calci și o aduci data viitoare", "You wash it, iron it and bring it next time", "धुनुहुन्छ, इस्त्री गर्नुहुन्छ र अर्को पटक ल्याउनुहुन्छ"],
+    ["Primești 70% din tariful de lenjerie", "You get 70% of the linen fee", "बेडसिट शुल्कको 70% पाउनुहुन्छ"],
+    ["Coordonează platforma.", "Coordinates the platform.", "प्लेटफर्म समन्वय गर्छ।"],
+    ["Aprobă locațiile și documentele", "Approves locations and documents", "स्थान र कागजात स्वीकृत गर्छ"],
+    ["Vede încasări, comision și plăți", "Sees revenue, commission and payments", "आम्दानी, कमिसन र भुक्तानी हेर्छ"],
+    ["Livrează stocul și urmărește lenjeria", "Delivers stock and tracks the linen", "स्टक डेलिभर गर्छ र बेडसिट ट्र्याक गर्छ"],
+    ["Garanția Sleep & Go", "The Sleep & Go guarantee", "Sleep & Go ग्यारेन्टी"],
+    ["Gata la timp, altfel", "On time, or else", "समयमै, अन्यथा"],
+    ["Dacă curățenia", "If the cleaning", "यदि सफाइ"],
+    ["nu este efectuată în intervalul orar rezervat", "is not done within the reserved time slot", "आरक्षित समयभित्र गरिएन भने"],
+    [", primești", ", you get", ", तपाईं पाउनुहुन्छ"],
+    ["toți banii înapoi", "all your money back", "सबै पैसा फिर्ता"],
+    ["pentru acea solicitare —", "for that request —", "त्यो अनुरोधका लागि —"],
+    ["compensație pentru deranj. Tu alegi ziua și intervalul, noi garantăm punctualitatea.", "compensation for the inconvenience. You choose the day and time, we guarantee punctuality.", "असुविधाका लागि क्षतिपूर्ति। तपाईं दिन र समय छान्नुहुन्छ, हामी समयनिष्ठताको ग्यारेन्टी गर्छौं।"],
+    ["✓ Curățenie în intervalul ales", "✓ Cleaning within the chosen slot", "✓ छानिएको समयमा सफाइ"],
+    ["✓ Agenți Cleaning verificați & evaluați", "✓ Verified & rated Cleaning Agents", "✓ प्रमाणित र मूल्याङ्कित Cleaning Agent"],
+    ["Nou · fără investiție în lenjerie", "New · no investment in linen", "नयाँ · बेडसिटमा लगानी बिना"],
+    ["Închiriere lenjerii regim hotelier", "Hotel-regime linen rental", "होटेल शैली बेडसिट भाडा"],
+    ["Nu vrei să cumperi lenjerie proprie? O închiriezi de la noi.", "Don't want to buy your own linen? Rent it from us.", "आफ्नै बेडसिट किन्न चाहनुहुन्न? हामीबाट भाडामा लिनुहोस्।"],
+    ["Serviciul de lenjerie", "The Linen service", "बेडसिट सेवा"],
+    ["ți-o aduce, o ridică după check-out, o spală și o returnează — tu nu te ocupi de nimic.", "brings it, picks it up after check-out, washes it and returns it — you handle nothing.", "ल्याउँछ, चेक-आउट पछि उठाउँछ, धुन्छ र फिर्ता गर्छ — तपाईंले केही गर्नुपर्दैन।"],
+    ["Momentan doar înregistrări — completează formularul și te contactăm cu detaliile și tarifele.", "For now, registrations only — fill in the form and we'll contact you with details and prices.", "अहिलेका लागि दर्ता मात्र — फारम भर्नुहोस्, हामी विवरण र मूल्यसहित सम्पर्क गर्नेछौं।"],
+    ["Te contactăm pentru serviciul de închiriere.", "We'll contact you about the rental service.", "भाडा सेवाबारे हामी सम्पर्क गर्नेछौं।"],
+    ["Transparent", "Transparent", "पारदर्शी"],
+    ["Curățenie de la", "Cleaning from", "सफाइ, यति देखि"],
+    ["Preț dinamic: 0.6 €/m² în afara orelor de vârf, 0.78 €/m² în intervalul de vârf (10:00–15:00, +30%), +10% în weekend și de sărbătorile legale. Fără costuri ascunse — vezi totalul înainte să plătești.", "Dynamic pricing: 0.6 €/m² off-peak, 0.78 €/m² at peak (10:00–15:00, +30%), +10% on weekends and public holidays. No hidden costs — see the total before you pay.", "गतिशील मूल्य: व्यस्त समय बाहिर 0.6 €/m², व्यस्त समयमा (10:00–15:00, +30%) 0.78 €/m², सप्ताहन्त र सार्वजनिक बिदामा +10%। कुनै लुकेको लागत छैन — भुक्तानी अघि कुल हेर्नुहोस्।"],
+    ["Curățenie (de la)", "Cleaning (from)", "सफाइ (देखि)"],
+    ["Interval de vârf (10–15)", "Peak hours (10–15)", "व्यस्त समय (10–15)"],
+    ["Preț de bază, înainte de 10:00 sau de la 15:00.", "Base price, before 10:00 or from 15:00.", "आधार मूल्य, 10:00 अघि वा 15:00 देखि।"],
+    ["0.78 €/m² în intervalul de vârf.", "0.78 €/m² during peak hours.", "व्यस्त समयमा 0.78 €/m²।"],
+    ["Interval de vârf — +30%.", "Peak hours — +30%.", "व्यस्त समय — +30%।"],
+    ["În afara orelor de vârf — preț de bază.", "Off-peak — base price.", "व्यस्त समय बाहिर — आधार मूल्य।"],
+    ["Adaos interval de vârf (+30%)", "Peak-hours surcharge (+30%)", "व्यस्त समय अधिभार (+30%)"],
+    ["Total estimativ", "Estimated total", "अनुमानित कुल"],
+    ["Fără", "Without", "बिना"],
+    ["Lenjerii (seturi)", "Linen (sets)", "बेडसिट (सेट)"],
+    ["➕ Adaugă locație", "➕ Add location", "➕ स्थान थप्नुहोस्"],
+    ["Mergi la înregistrare și trimite solicitarea", "Go to sign-up and send your request", "दर्तामा जानुहोस् र अनुरोध पठाउनुहोस्"],
+    ["Nu ai cont?", "No account?", "खाता छैन?"],
+    ["Înainte de 10:00 sau de la 15:00. În vârf (10–15): 1 €/m².", "Before 10:00 or from 15:00. At peak (10–15): 1 €/m².", "10:00 अघि वा 15:00 देखि। व्यस्त समयमा (10–15): 1 €/m²।"],
+    ["Weekend / sărbători", "Weekend / holidays", "सप्ताहन्त / बिदा"],
+    ["Suprataxă pentru sâmbătă, duminică și sărbătorile legale.", "Surcharge for Saturday, Sunday and public holidays.", "शनिबार, आइतबार र सार्वजनिक बिदाका लागि अतिरिक्त शुल्क।"],
+    ["Lenjerie (set)", "Linen (set)", "बेडसिट (सेट)"],
+    ["⏰ Solicitările se trimit până la ora 20:00.", "⏰ Requests can be sent until 20:00.", "⏰ अनुरोध 20:00 सम्म पठाउन सकिन्छ।"],
+    ["Creează un cont și trimite prima ta solicitare în câteva minute.", "Create an account and send your first request in minutes.", "खाता खोल्नुहोस् र केही मिनेटमै पहिलो अनुरोध पठाउनुहोस्।"],
+    ["Curățenie profesională în regim hotelier pentru închirieri pe termen scurt.", "Professional hotel-regime cleaning for short-term rentals.", "छोटो अवधि भाडाका लागि व्यावसायिक होटेल शैली सफाइ।"],
+    ["Platformă", "Platform", "प्लेटफर्म"],
+    ["Cont", "Account", "खाता"],
+    ["Pentru Agenți Cleaning →", "For Cleaning Agents →", "Cleaning Agent का लागि →"],
+    ["Serviciu de lenjerie →", "Linen service →", "बेडसिट सेवा →"],
+    ["© 2026 Sleep & Go Cleaning. Toate drepturile rezervate.", "© 2026 Sleep & Go Cleaning. All rights reserved.", "© 2026 Sleep & Go Cleaning. सर्वाधिकार सुरक्षित।"],
+  ].forEach(function (row) { EN_DICT[row[0]] = row[1]; NE_DICT[row[0]] = row[2]; });
+
+  // Autentificare + texte cu valori (runtime fixe) + circuit lenjerie
+  [
+    ["Cont nou", "New account", "नयाँ खाता"],
+    ["Curatenie regim hotelier", "Hotel-regime cleaning", "होटेल शैली सफाइ"],
+    ["← Înapoi la pagina principală", "← Back to home", "← गृह पृष्ठमा फर्कनुहोस्"],
+    ["bani înapoi + 50 lei", "money back + 50 lei", "पैसा फिर्ता + 50 lei"],
+    ["✓ Rambursare integrală + 50 lei", "✓ Full refund + 50 lei", "✓ पूर्ण फिर्ता + 50 lei"],
+    ["plus 50 lei", "plus 50 lei", "साथै 50 lei"],
+    ["50 lei/set · plic, cearșaf, 2 fețe de pernă, 2 prosoape, 1 prosop de baie.", "50 lei/set · duvet cover, sheet, 2 pillowcases, 2 towels, 1 bath towel.", "50 lei/सेट · डुभेट कभर, तन्ना, 2 सिरानी खोल, 2 तौलिया, 1 स्नान तौलिया।"],
+    ["Lasă recenzii dacă are minim 5 solicitări pe lună", "Leaves reviews with at least 5 requests per month", "महिनामा कम्तीमा 5 अनुरोध भए समीक्षा दिन्छ"],
+    ["Primul pas:", "First step:", "पहिलो चरण:"],
+    ["digitalizăm (etichetăm individual) fiecare lenjerie", "we digitize (individually tag) each linen set", "हामी प्रत्येक बेडसिट डिजिटल गर्छौं (छुट्टै ट्याग)"],
+    ["a ta, ca să nu fie niciodată încurcată cu a altcuiva — știm mereu unde e fiecare set. Apoi intră în circuit: proprietarul introduce", "of yours, so it's never mixed up with anyone else's — we always know where each set is. Then it enters the circuit: the owner adds", "तपाईंको, ताकि अरूको सँग कहिल्यै नमिसियोस् — प्रत्येक सेट कहाँ छ हामी सधैं थाहा पाउँछौं। त्यसपछि यो चक्रमा प्रवेश गर्छ: मालिकले थप्छ"],
+    ["minim 4 lenjerii", "at least 4 linen sets", "कम्तीमा 4 बेडसिट"],
+    [", care rotesc continuu —", ", which rotate continuously —", ", जुन निरन्तर घुम्छ —"],
+    ["în locație", "at the location", "स्थानमा"],
+    ["la spălătorie", "at the laundry", "धुलाइमा"],
+    ["depozitate la Agent Cleaning", "stored at the Agent Cleaning", "Agent Cleaning सँग भण्डारण"],
+    ["→ înapoi în locație — astfel la fiecare check-in există mereu lenjerie curată pregătită.", "→ back to the location — so at every check-in there's always clean linen ready.", "→ स्थानमा फिर्ता — ताकि हरेक चेक-इनमा सधैं सफा बेडसिट तयार होस्।"],
+    ["Calculează instant", "Calculate instantly", "तुरुन्तै गणना गर्नुहोस्"],
+    ["Simulator de preț", "Price simulator", "मूल्य सिम्युलेटर"],
+    ["Completează detaliile — vezi prețul estimativ în timp real, apoi solicită o ofertă.", "Fill in the details — see the estimated price in real time, then request an offer.", "विवरण भर्नुहोस् — अनुमानित मूल्य वास्तविक समयमा हेर्नुहोस्, त्यसपछि प्रस्ताव माग्नुहोस्।"],
+    ["Suprafață (m²)", "Area (m²)", "क्षेत्रफल (m²)"],
+    ["Data", "Date", "मिति"],
+    ["Consumabile (opțional)", "Consumables (optional)", "उपभोग्य वस्तु (वैकल्पिक)"],
+    ["Estimare preț", "Price estimate", "मूल्य अनुमान"],
+    ["Total estimativ (în avans)", "Estimated total (in advance)", "अनुमानित कुल (अग्रिम)"],
+    ["Solicită ofertă", "Request offer", "प्रस्ताव माग्नुहोस्"],
+    ["Adresă, detalii sau întrebări", "Address, details or questions", "ठेगाना, विवरण वा प्रश्न"],
+    ["Cerere de ofertă trimisă! Te contactăm în curând.", "Offer request sent! We'll contact you soon.", "प्रस्ताव अनुरोध पठाइयो! हामी चाँडै सम्पर्क गर्नेछौं।"],
+    ["Preț de bază curățenie (€/m²)", "Base cleaning price (€/m²)", "आधार सफाइ मूल्य (€/m²)"],
+    ["Interval de vârf — preț întreg.", "Peak hours — full price.", "व्यस्त समय — पूरा मूल्य।"],
+  ].forEach(function (row) { EN_DICT[row[0]] = row[1]; NE_DICT[row[0]] = row[2]; });
+
+  function _trPhrase(s) {
+    const D = DICTS[LANG];
+    if (!D || !s) return s;
+    const t = s.trim();
+    if (!t) return s;
+    const lead = s.slice(0, s.length - s.trimStart().length);
+    const tail = s.slice(s.trimEnd().length);
+    if (D[t] != null) return lead + D[t] + tail;
+    // tab-uri cu numărător: „🧹 Lucrările mele (5)" → tradu prefixul, păstrează (5)
+    const m = t.match(/^(.*?)\s*(\([^)]*\))\s*$/);
+    if (m && D[m[1]] != null) return lead + D[m[1]] + " " + m[2] + tail;
+    return s;
+  }
+  function translateTree(node) {
+    if (LANG === "ro" || !node) return;
+    if (node.nodeType === 3) { if (node.nodeValue && node.nodeValue.trim()) node.nodeValue = _trPhrase(node.nodeValue); return; }
+    if (node.nodeType !== 1) return;
+    if (node.id === "langSelect") return;
+    ["placeholder", "title", "aria-label"].forEach(a => { const v = node.getAttribute && node.getAttribute(a); if (v) node.setAttribute(a, _trPhrase(v)); });
+    if (node.tagName === "INPUT" && (node.type === "submit" || node.type === "button") && node.value) node.value = _trPhrase(node.value);
+    let c = node.firstChild;
+    while (c) { const next = c.nextSibling; translateTree(c); c = next; }
+  }
+  function initLang() {
+    if (_langInited) return; _langInited = true;
+    let sel = document.getElementById("langSelect");
+    if (!sel) {
+      sel = document.createElement("select");
+      sel.id = "langSelect"; sel.className = "lang-select";
+      sel.innerHTML = '<option value="ro">🌐 RO</option><option value="en">🌐 EN</option><option value="ne">🌐 ने</option>';
+      document.body.appendChild(sel);
+    }
+    sel.value = LANG;
+    sel.onchange = () => { try { localStorage.setItem("sgc_lang", sel.value); } catch (e) {} location.reload(); };
+    const obs = new MutationObserver(muts => { if (LANG === "ro") return; muts.forEach(m => m.addedNodes.forEach(n => translateTree(n))); });
+    obs.observe(document.body, { childList: true, subtree: true });
+    if (LANG !== "ro") translateTree(document.body);
+  }
+
   /* ---------- start ---------- */
   // Inițializează stocarea (server Railway sau localStorage), apoi randează.
   // onRemote = re-randare când alt utilizator schimbă datele (polling).
-  S.init(() => { try { renderApp(); } catch (e) {} }).then(() => renderApp()).catch(() => renderApp());
+  S.init(() => { try { renderApp(); } catch (e) {} })
+    .then(() => { renderApp(); initLang(); })
+    .catch(() => { renderApp(); initLang(); });
 })();
 
 </script>
