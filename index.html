@@ -2403,12 +2403,12 @@ body.landing-active { background: var(--h-bg); }
       const rows = [];
       rows.push(`<div class="sb-row"><span>Curățenie (${Number(d.sqm) || 0} m²)</span><span>${money(b.cleaningNet)}</span></div>`);
       rows.push(`<div class="sb-row sur"><span>Comision platformă (${b.pct}%)</span><span>−${money(commissionCleaning)}</span></div>`);
-      if (b.linenTaken && b.linenSets > 0) rows.push(`<div class="sb-row"><span>Lenjerie (${b.linenSets} × ${C.linenSetPriceRon} lei) · o preiei tu</span><span>+${money(b.linenPayout)}</span></div>`);
-      if (b.consExecutantPayout > 0) rows.push(`<div class="sb-row"><span>Consumabile (partea ta, ${C.consumableSplit.executant}% adaos)</span><span>+${money(b.consExecutantPayout)}</span></div>`);
+      if (b.linenTaken && b.linenSets > 0) rows.push(`<div class="sb-row"><span>Lenjerie preluată de tine (${b.linenSets} × ${C.linenSetPriceRon} lei)</span><span>+${money(b.linenPayout)}</span></div>`);
+      if (b.consExecutantPayout > 0) rows.push(`<div class="sb-row"><span>Consumabile — partea ta din adaos (${C.consumableSplit.executant}%)</span><span>+${money(b.consExecutantPayout)}</span></div>`);
       $("#exBreakdown").innerHTML = rows.join("");
       $("#exTotal").innerHTML = `${money(b.payout)} <small style="font-size:14px;color:var(--h-muted);font-weight:600">≈ ${leiOf(b.payout)} lei</small>`;
       const peak = S.isPeak(d.startTime), wh = S.isWeekendOrHoliday(d.date);
-      $("#exNote").textContent = (peak ? `Interval de vârf — clientul plătește +${C.schedule.peakSurchargePct}%, deci încasezi mai mult.` : "În afara orelor de vârf — preț de bază.") + (wh ? ` Weekend/sărbătoare — +${C.weekendHolidaySurchargePct}%.` : "");
+      $("#exNote").textContent = (peak ? "Interval de vârf — clientul plătește mai mult, deci încasezi mai mult." : "În afara orelor de vârf — preț de bază.") + (wh ? " Weekend/sărbătoare — încasezi în plus." : "");
     }
     const exSection = $("#exSim");
     if (exSection) {
@@ -2582,7 +2582,7 @@ body.landing-active { background: var(--h-bg); }
       rows.push(`<div class="sb-row sur"><span>Comision platformă (${pct}%)</span><span>−${money(linenComm)}</span></div>`);
       if (q.consumablesCostRon > 0) {
         rows.push(`<div class="sb-row"><span>Consumabile — achiziție rambursată</span><span>+${money(consCostEur)}</span></div>`);
-        rows.push(`<div class="sb-row"><span>Consumabile — partea ta (${C.consumableSplit.laundry}% adaos)</span><span>+${money(consLaundryMarkup)}</span></div>`);
+        rows.push(`<div class="sb-row"><span>Consumabile — partea ta din adaos (${C.consumableSplit.laundry}%)</span><span>+${money(consLaundryMarkup)}</span></div>`);
       }
       $("#laBreakdown").innerHTML = rows.join("");
       $("#laTotal").innerHTML = `${money(total)} <small style="font-size:14px;color:var(--h-muted);font-weight:600">≈ ${leiOf(total)} lei</small>`;
@@ -4146,6 +4146,16 @@ body.landing-active { background: var(--h-bg); }
     ["Consumabile distribuite (partea ta)", "Consumables distributed (your share)", "वितरण गरिएका उपभोग्य वस्तु (तपाईंको भाग)"],
     ["Devino serviciu de lenjerie", "Become a linen service", "बेडसिट सेवा बन्नुहोस्"],
     ["Preiei rute din zona ta după înregistrare.", "Take routes in your area after signing up.", "दर्ता पछि आफ्नो क्षेत्रका रूटहरू लिनुहोस्।"],
+    ["Ora început", "Start time", "सुरु समय"],
+    ["Curățenie", "Cleaning", "सफाइ"],
+    ["Comision platformă", "Platform commission", "प्लेटफर्म कमिसन"],
+    ["Spălare lenjerie", "Linen washing", "बेडसिट धुलाइ"],
+    ["Lenjerie preluată de tine", "Linen taken by you", "तपाईंले लिएको बेडसिट"],
+    ["Consumabile — partea ta din adaos", "Consumables — your share of the markup", "उपभोग्य वस्तु — मार्कअपको तपाईंको भाग"],
+    ["Consumabile — achiziție rambursată", "Consumables — purchase reimbursed", "उपभोग्य वस्तु — खरिद फिर्ता"],
+    ["Interval de vârf — clientul plătește mai mult, deci încasezi mai mult.", "Peak hours — the client pays more, so you earn more.", "व्यस्त समय — ग्राहकले बढी तिर्छ, त्यसैले तपाईं बढी कमाउनुहुन्छ।"],
+    ["Weekend/sărbătoare — încasezi în plus.", "Weekend/holiday — you earn extra.", "सप्ताहन्त/बिदा — तपाईं थप कमाउनुहुन्छ।"],
+    ["Spălare după comision + achiziția consumabilelor rambursată + partea ta din adaos.", "Washing after commission + consumables purchase reimbursed + your share of the markup.", "कमिसन पछि धुलाइ + उपभोग्य वस्तु खरिद फिर्ता + मार्कअपको तपाईंको भाग।"],
     ["Înainte de 10:00 sau de la 15:00. În vârf (10–15): 1 €/m².", "Before 10:00 or from 15:00. At peak (10–15): 1 €/m².", "10:00 अघि वा 15:00 देखि। व्यस्त समयमा (10–15): 1 €/m²।"],
     ["Weekend / sărbători", "Weekend / holidays", "सप्ताहन्त / बिदा"],
     ["Suprataxă pentru sâmbătă, duminică și sărbătorile legale.", "Surcharge for Saturday, Sunday and public holidays.", "शनिबार, आइतबार र सार्वजनिक बिदाका लागि अतिरिक्त शुल्क।"],
