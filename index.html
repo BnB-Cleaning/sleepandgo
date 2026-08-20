@@ -2229,6 +2229,7 @@ body.landing-active { background: var(--h-bg); }
     document.body.classList.add("landing-active");
     app.innerHTML = "";
     const cleanPct = 100 - S.commissionPct();
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
     const benefits = [
       ["📍", "Lucrezi în zona ta", "Vezi doar solicitările din zona ta de activitate. Te înscrii la ce vrei, când vrei — fără drumuri inutile."],
       ["💸", "Plată sigură, în avans", "Clientul plătește în avans, prin platformă. Tu încasezi automat după ce marchezi lucrarea finalizată."],
@@ -2275,15 +2276,34 @@ body.landing-active { background: var(--h-bg); }
           </div>
           <div class="h-preview">
             <div class="pv-glow"></div>
-            <div class="pv-chip a">✋ Te-ai înscris</div>
-            <div class="card-mock">
-              <div class="pv-top"><div><h3>Curățenie · 55 m²</h3><div class="pv-meta"><span>📍 București · Sector 3</span><span>📅 10:00–14:00</span><span>🛏️ 2 seturi lenjerie</span><span>🧴 3 consumabile</span></div></div><span class="pv-badge">Disponibilă</span></div>
-              <div class="pv-sum">
-                <div class="pv-line"><span>Curățenie (55 m²)</span><span>€55.00</span></div>
-                <div class="pv-line"><span>Comision platformă (${S.commissionPct()}%)</span><span>−€16.50</span></div>
-                <div class="pv-line"><span>Lenjerie (2 × 50 lei) · dacă o preiei</span><span>+€14.08</span></div>
-                <div class="pv-line"><span>Consumabile (partea ta)</span><span>+€0.70</span></div>
-                <div class="pv-line total"><span>Tu primești</span><span class="amt">€53.28</span></div>
+            <div class="pv-chip a">💶 Calculează-ți câștigul</div>
+            <div class="card-mock h-hero-sim" id="exSim">
+              <div class="hs-title">Cât câștigi — simulator</div>
+              <div class="rf-row">
+                <div class="rf-field"><label>Suprafață (m²)</label><input type="number" id="exSqm" min="1" value="52" autocomplete="off" /></div>
+                <div class="rf-field"><label>Ora început</label><select id="exStart" autocomplete="off">${hourOpts(C.schedule.open, C.schedule.close - C.schedule.minHours, "10:00")}</select></div>
+              </div>
+              <div class="rf-row">
+                <div class="rf-field"><label>Data</label><input type="date" id="exDate" value="${tomorrow}" min="${tomorrow}" autocomplete="off" /></div>
+                <div class="rf-field" id="exSetsWrap"><label>Lenjerii (seturi)</label><input type="number" id="exSets" min="0" value="2" autocomplete="off" /></div>
+              </div>
+              <div class="rf-field"><label>Preiei lenjeria?</label>
+                <div class="sim-radio">
+                  <label><input type="radio" name="exLinen" value="with" checked /> Da, o preiau</label>
+                  <label><input type="radio" name="exLinen" value="without" /> Nu</label>
+                </div>
+              </div>
+              <div class="rf-field"><label>Consumabile (partea ta)</label>
+                <div class="sim-cons">
+                  ${S.activeProducts().map(p => `<label class="sim-cons-row"><span>${esc(p.name)} <small>(${p.priceRon} lei)</small></span><input type="number" class="exCons" data-pid="${p.id}" data-def="${p.id === "p_hartie" ? 2 : 0}" min="0" value="${p.id === "p_hartie" ? 2 : 0}" autocomplete="off" /></label>`).join("")}
+                </div>
+              </div>
+              <div id="exBreakdown" class="sim-breakdown"></div>
+              <div class="sim-total-row"><span>Tu primești</span><span id="exTotal" class="sim-total">€0.00</span></div>
+              <p class="hint" id="exNote" style="color:var(--h-muted);margin:6px 0 0"></p>
+              <div class="hs-alt">
+                <button class="h-btn primary" type="button" data-reg="executant" style="width:100%">Înscrie-te ca Agent Cleaning</button>
+                <p class="hs-signup">Vezi solicitările plătite din zona ta după înregistrare.</p>
               </div>
             </div>
             <div class="pv-chip b">💸 Plătit după finalizare</div>
@@ -2355,6 +2375,48 @@ body.landing-active { background: var(--h-bg); }
       const target = document.getElementById(a.dataset.scroll);
       if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
     });
+
+    /* ---- Simulator de câștig (Agent Cleaning) — arată cât primește executantul ---- */
+    const exReadCons = () => [...document.querySelectorAll(".exCons")]
+      .map(i => ({ productId: i.dataset.pid, qty: Number(i.value) || 0 })).filter(c => c.qty > 0);
+    const exRead = () => {
+      const linens = ($('input[name="exLinen"]:checked') || {}).value !== "without";
+      return {
+        sqm: $("#exSqm") ? $("#exSqm").value : 0,
+        date: $("#exDate") ? $("#exDate").value : "",
+        startTime: $("#exStart") ? $("#exStart").value : "10:00",
+        linens, linenExecutorId: linens ? "sim" : null,
+        linenSets: $("#exSets") ? $("#exSets").value : 0,
+        consumables: exReadCons(),
+      };
+    };
+    function exRecalc() {
+      if (!$("#exTotal")) return;
+      const d = exRead();
+      const wrap = $("#exSetsWrap"); if (wrap) wrap.style.display = d.linens ? "" : "none";
+      const b = S.breakdown({
+        sqm: Number(d.sqm) || 0, startTime: d.startTime, date: d.date,
+        linens: d.linens, linenExecutorId: d.linenExecutorId,
+        linenSets: Number(d.linenSets) || 0, consumables: d.consumables,
+      });
+      const commissionCleaning = b.cleaningNet - b.cleaningPayout;
+      const rows = [];
+      rows.push(`<div class="sb-row"><span>Curățenie (${Number(d.sqm) || 0} m²)</span><span>${money(b.cleaningNet)}</span></div>`);
+      rows.push(`<div class="sb-row sur"><span>Comision platformă (${b.pct}%)</span><span>−${money(commissionCleaning)}</span></div>`);
+      if (b.linenTaken && b.linenSets > 0) rows.push(`<div class="sb-row"><span>Lenjerie (${b.linenSets} × ${C.linenSetPriceRon} lei) · o preiei tu</span><span>+${money(b.linenPayout)}</span></div>`);
+      if (b.consExecutantPayout > 0) rows.push(`<div class="sb-row"><span>Consumabile (partea ta, ${C.consumableSplit.executant}% adaos)</span><span>+${money(b.consExecutantPayout)}</span></div>`);
+      $("#exBreakdown").innerHTML = rows.join("");
+      $("#exTotal").innerHTML = `${money(b.payout)} <small style="font-size:14px;color:var(--h-muted);font-weight:600">≈ ${leiOf(b.payout)} lei</small>`;
+      const peak = S.isPeak(d.startTime), wh = S.isWeekendOrHoliday(d.date);
+      $("#exNote").textContent = (peak ? `Interval de vârf — clientul plătește +${C.schedule.peakSurchargePct}%, deci încasezi mai mult.` : "În afara orelor de vârf — preț de bază.") + (wh ? ` Weekend/sărbătoare — +${C.weekendHolidaySurchargePct}%.` : "");
+    }
+    const exSection = $("#exSim");
+    if (exSection) {
+      // forțează consumabilele la valorile implicite (unele browsere restaurează valori vechi)
+      document.querySelectorAll(".exCons").forEach(i => { i.value = i.dataset.def || "0"; });
+      ["input", "change"].forEach(ev => exSection.addEventListener(ev, exRecalc));
+      exRecalc();
+    }
   }
 
   /* =========================================================
@@ -2412,13 +2474,21 @@ body.landing-active { background: var(--h-bg); }
           </div>
           <div class="h-preview">
             <div class="pv-glow"></div>
-            <div class="pv-chip a">🧺 De ridicat azi</div>
-            <div class="card-mock">
-              <div class="pv-top"><div><h3>Lenjerie de spălat · 6 seturi</h3><div class="pv-meta"><span>📍 București · Sector 3</span><span>🚐 ridicare + livrare</span><span>🛏️ plic, cearșaf, prosoape</span></div></div><span class="pv-badge">De ridicat</span></div>
-              <div class="pv-sum">
-                <div class="pv-line"><span>Spălare lenjerie (6 × ${C.linenSetPriceRon} lei)</span><span>${6 * C.linenSetPriceRon} lei</span></div>
-                <div class="pv-line"><span>Comision platformă (${S.commissionPct()}%)</span><span>−${Math.round(6 * C.linenSetPriceRon * S.commissionPct() / 100)} lei</span></div>
-                <div class="pv-line total"><span>Tu primești</span><span class="amt">${Math.round(6 * C.linenSetPriceRon * linenPct / 100)} lei ≈ ${money(S.ronToEur(6 * C.linenSetPriceRon * linenPct / 100))}</span></div>
+            <div class="pv-chip a">💶 Calculează-ți câștigul</div>
+            <div class="card-mock h-hero-sim" id="laSim">
+              <div class="hs-title">Cât câștigi — simulator</div>
+              <div class="rf-field"><label>Seturi de lenjerie de spălat</label><input type="number" id="laSets" min="0" value="6" autocomplete="off" /></div>
+              <div class="rf-field"><label>Consumabile distribuite (partea ta)</label>
+                <div class="sim-cons">
+                  ${S.activeProducts().map(p => `<label class="sim-cons-row"><span>${esc(p.name)} <small>(${p.priceRon} lei)</small></span><input type="number" class="laCons" data-pid="${p.id}" data-def="${p.id === "p_hartie" ? 2 : 0}" min="0" value="${p.id === "p_hartie" ? 2 : 0}" autocomplete="off" /></label>`).join("")}
+                </div>
+              </div>
+              <div id="laBreakdown" class="sim-breakdown"></div>
+              <div class="sim-total-row"><span>Tu primești</span><span id="laTotal" class="sim-total">€0.00</span></div>
+              <p class="hint" id="laNote" style="color:var(--h-muted);margin:6px 0 0"></p>
+              <div class="hs-alt">
+                <button class="h-btn primary" type="button" data-reg="spalatorie" style="width:100%">Devino serviciu de lenjerie</button>
+                <p class="hs-signup">Preiei rute din zona ta după înregistrare.</p>
               </div>
             </div>
             <div class="pv-chip b">💸 Plătit după procesare</div>
@@ -2490,6 +2560,40 @@ body.landing-active { background: var(--h-bg); }
       const target = document.getElementById(a.dataset.scroll);
       if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
     });
+
+    /* ---- Simulator de câștig (Serviciu lenjerie) — spălare + partea din consumabile ---- */
+    const laReadCons = () => [...document.querySelectorAll(".laCons")]
+      .map(i => ({ productId: i.dataset.pid, qty: Number(i.value) || 0 })).filter(c => c.qty > 0);
+    function laRecalc() {
+      if (!$("#laTotal")) return;
+      const sets = Number(($("#laSets") || {}).value) || 0;
+      const cons = laReadCons();
+      const q = S.quote({ sqm: 0, startTime: "10:00", date: "", linens: true, linenSets: sets, consumables: cons });
+      const pct = S.commissionPct();
+      const linenGross = q.linenEur;
+      const linenComm = linenGross * pct / 100;
+      const linenPayout = linenGross - linenComm;
+      const consCostEur = S.ronToEur(q.consumablesCostRon);
+      const consMarkupEur = S.ronToEur(q.consumablesMarkupRon);
+      const consLaundryMarkup = consMarkupEur * C.consumableSplit.laundry / 100;
+      const total = linenPayout + consCostEur + consLaundryMarkup;
+      const rows = [];
+      rows.push(`<div class="sb-row"><span>Spălare lenjerie (${sets} × ${C.linenSetPriceRon} lei)</span><span>${money(linenGross)}</span></div>`);
+      rows.push(`<div class="sb-row sur"><span>Comision platformă (${pct}%)</span><span>−${money(linenComm)}</span></div>`);
+      if (q.consumablesCostRon > 0) {
+        rows.push(`<div class="sb-row"><span>Consumabile — achiziție rambursată</span><span>+${money(consCostEur)}</span></div>`);
+        rows.push(`<div class="sb-row"><span>Consumabile — partea ta (${C.consumableSplit.laundry}% adaos)</span><span>+${money(consLaundryMarkup)}</span></div>`);
+      }
+      $("#laBreakdown").innerHTML = rows.join("");
+      $("#laTotal").innerHTML = `${money(total)} <small style="font-size:14px;color:var(--h-muted);font-weight:600">≈ ${leiOf(total)} lei</small>`;
+      $("#laNote").textContent = "Spălare după comision + achiziția consumabilelor rambursată + partea ta din adaos.";
+    }
+    const laSection = $("#laSim");
+    if (laSection) {
+      document.querySelectorAll(".laCons").forEach(i => { i.value = i.dataset.def || "0"; });
+      ["input", "change"].forEach(ev => laSection.addEventListener(ev, laRecalc));
+      laRecalc();
+    }
   }
 
   /* =========================================================
@@ -4029,6 +4133,19 @@ body.landing-active { background: var(--h-bg); }
     ["➕ Adaugă locație", "➕ Add location", "➕ स्थान थप्नुहोस्"],
     ["Mergi la înregistrare și trimite solicitarea", "Go to sign-up and send your request", "दर्तामा जानुहोस् र अनुरोध पठाउनुहोस्"],
     ["Nu ai cont?", "No account?", "खाता छैन?"],
+    ["Cât câștigi — simulator", "How much you earn — simulator", "तपाईं कति कमाउनुहुन्छ — सिमुलेटर"],
+    ["Preiei lenjeria?", "Do you take the linen?", "के तपाईं बेडसिट लिनुहुन्छ?"],
+    ["Da, o preiau", "Yes, I take it", "हो, म लिन्छु"],
+    ["Nu", "No", "होइन"],
+    ["Consumabile (partea ta)", "Consumables (your share)", "उपभोग्य वस्तु (तपाईंको भाग)"],
+    ["Tu primești", "You receive", "तपाईंले पाउनुहुन्छ"],
+    ["Înscrie-te ca Agent Cleaning", "Sign up as a Cleaning Agent", "Cleaning Agent को रूपमा दर्ता गर्नुहोस्"],
+    ["Vezi solicitările plătite din zona ta după înregistrare.", "See paid requests in your area after signing up.", "दर्ता पछि आफ्नो क्षेत्रका भुक्तानी अनुरोधहरू हेर्नुहोस्।"],
+    ["💶 Calculează-ți câștigul", "💶 Calculate your earnings", "💶 आफ्नो कमाइ गणना गर्नुहोस्"],
+    ["Seturi de lenjerie de spălat", "Linen sets to wash", "धुनुपर्ने बेडसिट सेट"],
+    ["Consumabile distribuite (partea ta)", "Consumables distributed (your share)", "वितरण गरिएका उपभोग्य वस्तु (तपाईंको भाग)"],
+    ["Devino serviciu de lenjerie", "Become a linen service", "बेडसिट सेवा बन्नुहोस्"],
+    ["Preiei rute din zona ta după înregistrare.", "Take routes in your area after signing up.", "दर्ता पछि आफ्नो क्षेत्रका रूटहरू लिनुहोस्।"],
     ["Înainte de 10:00 sau de la 15:00. În vârf (10–15): 1 €/m².", "Before 10:00 or from 15:00. At peak (10–15): 1 €/m².", "10:00 अघि वा 15:00 देखि। व्यस्त समयमा (10–15): 1 €/m²।"],
     ["Weekend / sărbători", "Weekend / holidays", "सप्ताहन्त / बिदा"],
     ["Suprataxă pentru sâmbătă, duminică și sărbătorile legale.", "Surcharge for Saturday, Sunday and public holidays.", "शनिबार, आइतबार र सार्वजनिक बिदाका लागि अतिरिक्त शुल्क।"],
