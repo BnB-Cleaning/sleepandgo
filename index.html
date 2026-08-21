@@ -371,6 +371,27 @@ a.pill.contact:hover { background: var(--brand); color: #fff; }
    HOME / LANDING — brand Sleep & Go (alb/albastru)
    ========================================================= */
 
+/* ===== Calendar de sume (cheltuieli client / încasări agent) ===== */
+.cal-wrap { max-width: 600px; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.cal-title { font-weight: 800; font-size: 18px; text-transform: capitalize; }
+.cal-nav { padding: 4px 16px; font-size: 20px; line-height: 1; }
+.cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 4px 0 6px; }
+.cal-weekdays > div { text-align: center; font-size: 12px; color: var(--muted, #8aa); font-weight: 700; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.cal-cell { min-height: 58px; border-radius: 10px; padding: 6px; display: flex; flex-direction: column; justify-content: space-between; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); }
+.cal-cell.empty { background: transparent; border: none; }
+.cal-cell.has { background: rgba(56,189,248,.14); border-color: rgba(56,189,248,.4); }
+.cal-cell.today { outline: 2px solid var(--brand, #22d3ee); outline-offset: -1px; }
+.cal-day { font-size: 12px; color: var(--muted, #9ab); font-weight: 600; }
+.cal-amt { font-size: 12.5px; font-weight: 800; align-self: flex-start; }
+
+/* ===== Multi-zonă (Serviciu lenjerie) ===== */
+.area-checks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 14px; }
+.area-check { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; padding: 4px 2px; }
+.area-check input { width: 16px; height: 16px; flex: none; }
+@media (max-width: 560px) { .area-checks { grid-template-columns: 1fr; } }
+
 /* =========================================================
    Sleep & Go Cleaning — HOME / LANDING
    Brand preluat de pe sleepandgocleaning.com:
@@ -1080,7 +1101,7 @@ body.landing-active { background: var(--h-bg); }
         if (![STATUS.ACCEPTAT, STATUS.IN_PROGRES, STATUS.FINALIZAT].includes(r.status)) return { ok: false };
       } else if (usr && usr.role === "spalatorie") {
         // serviciul de lenjerie o preia doar dacă Agentul Cleaning de curățenie a refuzat, în zona lui
-        if (!r.linenDeclined || r.area !== usr.area) return { ok: false };
+        if (!r.linenDeclined || !this.areasOf(usr).includes(r.area)) return { ok: false };
         if (r.status === STATUS.ANULAT || r.status === STATUS.NOU) return { ok: false };
       } else {
         return { ok: false };
@@ -1089,8 +1110,9 @@ body.landing-active { background: var(--h-bg); }
     },
     // solicitări cu lenjerie refuzată de Agent Cleaning, disponibile pentru „Serviciu lenjerie" din zonă
     availableLinenForLaundry(user) {
+      const areas = this.areasOf(user);
       return this.requests().filter(r =>
-        r.linens && !r.linenExecutorId && r.linenDeclined && r.area === user.area &&
+        r.linens && !r.linenExecutorId && r.linenDeclined && areas.includes(r.area) &&
         r.status !== STATUS.ANULAT && r.status !== STATUS.NOU);
     },
     laundryJobsOf(userId) { return this.requests().filter(r => r.linenExecutorId === userId); },
@@ -1209,6 +1231,8 @@ body.landing-active { background: var(--h-bg); }
     // ---- Utilizatori ----
     users() { return db.users.slice(); },
     userById(id) { return db.users.find(u => u.id === id) || null; },
+    // zonele în care activează un utilizator (Serviciul de lenjerie poate avea mai multe)
+    areasOf(u) { const x = u && u.areas; return (Array.isArray(x) && x.length) ? x : (u && u.area ? [u.area] : []); },
     // există cel puțin un Agent Cleaning (curățenie) activ în zonă?
     hasActiveExecutorInArea(area) { return db.users.some(u => u.role === "executant" && u.area === area); },
     setAvatar(id, dataUrl) {
@@ -2694,6 +2718,7 @@ body.landing-active { background: var(--h-bg); }
         <button data-t="new" class="${solTab === "new" ? "active" : ""}">➕ Solicitare nouă</button>
         <button data-t="locations" class="${solTab === "locations" ? "active" : ""}">📍 Locațiile mele${pendingLoc ? ` (${pendingLoc} în așteptare)` : ""}</button>
         <button data-t="mine" class="${solTab === "mine" ? "active" : ""}">📋 Solicitările mele</button>
+        <button data-t="expenses" class="${solTab === "expenses" ? "active" : ""}">💶 Cheltuieli</button>
         <button data-t="linen" class="${solTab === "linen" ? "active" : ""}">🧺 Lenjeria mea</button>
       </div>
       <div id="solBody"></div>
@@ -2703,6 +2728,7 @@ body.landing-active { background: var(--h-bg); }
     if (seeBtn) seeBtn.onclick = () => { solTab = "mine"; renderSolicitant(u); };
     if (solTab === "new") renderNewRequest(u);
     else if (solTab === "locations") renderMyLocations(u);
+    else if (solTab === "expenses") renderMyExpenses(u);
     else if (solTab === "linen") renderMyLinen(u);
     else renderMyRequests(u);
   }
@@ -3070,6 +3096,70 @@ body.landing-active { background: var(--h-bg); }
     body.appendChild(wrap);
   }
 
+  /* ===== Calendar lunar de sume (cheltuieli client / încasări agent) ===== */
+  let calOffset = 0;   // 0 = luna curentă, -1 = luna trecută, etc.
+  const CAL_MONTHS = ["ianuarie", "februarie", "martie", "aprilie", "mai", "iunie", "iulie", "august", "septembrie", "octombrie", "noiembrie", "decembrie"];
+  // entries: [{date:'YYYY-MM-DD', amount:Number}]; cfg:{totalLabel, accent, rerender}
+  function expenseCalendarEl(entries, cfg) {
+    const now = new Date();
+    const target = new Date(now.getFullYear(), now.getMonth() + calOffset, 1);
+    const y = target.getFullYear(), m = target.getMonth();
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    let firstWd = new Date(y, m, 1).getDay();      // 0=duminică
+    firstWd = (firstWd + 6) % 7;                    // luni = 0
+    const byDay = {}; let monthTotal = 0, monthCount = 0;
+    (entries || []).forEach(e => {
+      if (!e.date) return;
+      const d = new Date(e.date + "T00:00:00");
+      if (d.getFullYear() === y && d.getMonth() === m) {
+        const day = d.getDate();
+        byDay[day] = (byDay[day] || 0) + (Number(e.amount) || 0);
+        monthTotal += Number(e.amount) || 0; monthCount++;
+      }
+    });
+    const wk = ["L", "Ma", "Mi", "J", "V", "S", "D"];
+    const todayD = (now.getFullYear() === y && now.getMonth() === m) ? now.getDate() : -1;
+    let cells = "";
+    for (let i = 0; i < firstWd; i++) cells += `<div class="cal-cell empty"></div>`;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const amt = byDay[d];
+      cells += `<div class="cal-cell${d === todayD ? " today" : ""}${amt ? " has" : ""}"><span class="cal-day">${d}</span>${amt ? `<span class="cal-amt">${money(amt)}</span>` : ""}</div>`;
+    }
+    const wrap = el(`
+      <div class="cal-wrap">
+        <div class="cal-head">
+          <button class="btn btn-soft cal-nav" type="button" data-cal="-1">‹</button>
+          <div class="cal-title">${CAL_MONTHS[m]} ${y}</div>
+          <button class="btn btn-soft cal-nav" type="button" data-cal="1">›</button>
+        </div>
+        <div class="card stat" style="margin:10px 0"><span class="label">${cfg.totalLabel} (${monthCount})</span><span class="value ${cfg.accent || ""}">${money(monthTotal)} <small style="font-size:13px;color:var(--muted,#8aa)">≈ ${leiOf(monthTotal)} lei</small></span></div>
+        <div class="cal-weekdays">${wk.map(w => `<div>${w}</div>`).join("")}</div>
+        <div class="cal-grid">${cells}</div>
+      </div>`);
+    wrap.querySelectorAll("[data-cal]").forEach(b => b.onclick = () => { calOffset += Number(b.dataset.cal); cfg.rerender(); });
+    return wrap;
+  }
+  // câștigul unui agent dintr-o solicitare (curățenie + consumabile + lenjerie, dacă e cazul)
+  function agentEarnOf(r, uid) {
+    const b = S.breakdown(r);
+    let amt = 0;
+    if (r.executorId === uid) amt += b.cleaningPayout + b.consExecutantPayout;
+    if (r.linens && r.linenExecutorId === uid) amt += b.linenPayout;
+    if (r.linenExecutorId === uid && b.consLaundryPayout > 0) amt += b.consLaundryPayout;
+    return Math.round(amt * 100) / 100;
+  }
+
+  /* Solicitant: calendar cu cheltuielile lunare (cât a plătit pe curățenii) */
+  function renderMyExpenses(u) {
+    const body = $("#solBody");
+    const list = S.requestsOfRequester(u.id).filter(r => r.status !== S.STATUS.NOU && r.status !== S.STATUS.ANULAT);
+    const entries = list.map(r => ({ date: r.date, amount: S.priceOf(r).total }));
+    body.innerHTML = "";
+    body.appendChild(el(`<div class="section-title" style="margin-top:0">💶 Cheltuielile mele</div>`));
+    body.appendChild(el(`<p class="hint" style="margin:0 0 12px">Cât ai plătit pentru curățenie, pe zile. Navighează pe luni cu ‹ ›.</p>`));
+    body.appendChild(expenseCalendarEl(entries, { totalLabel: "Total cheltuit luna aceasta", accent: "", rerender: () => renderSolicitant(u) }));
+  }
+
   /* Inventarul de lenjerie al solicitantului (doar citire) — unde se află seturile lui acum */
   function renderMyLinen(u) {
     const body = $("#solBody");
@@ -3127,6 +3217,7 @@ body.landing-active { background: var(--h-bg); }
         <button data-t="available" class="${execTab === "available" ? "active" : ""}">📍 Disponibile în zonă (${avail.length})</button>
         <button data-t="jobs" class="${execTab === "jobs" ? "active" : ""}">🧹 Lucrările mele (${jobs.length})</button>
         <button data-t="activity" class="${execTab === "activity" ? "active" : ""}">⏱️ Activitatea mea</button>
+        <button data-t="earnings" class="${execTab === "earnings" ? "active" : ""}">💶 Încasări</button>
         <button data-t="stock" class="${execTab === "stock" ? "active" : ""}">📦 Stocul meu</button>
       </div>
       <div id="execBody"></div>
@@ -3137,8 +3228,26 @@ body.landing-active { background: var(--h-bg); }
     if (execTab === "available") renderAvailable(u, avail);
     else if (execTab === "stock") renderMyStock(u);
     else if (execTab === "activity") renderMyActivity(u);
+    else if (execTab === "earnings") renderMyEarnings(u);
     else renderMyJobs(u, jobs);
   }
+
+  /* Calendar de încasări — comun Agent Cleaning + Serviciu lenjerie (câștigul e calculat la fel) */
+  function renderEarningsCalendar(u, body, rerender) {
+    const jobs = S.jobsOfExecutor(u.id).filter(r => r.status !== S.STATUS.ANULAT);
+    const entries = jobs.map(r => ({ date: r.date, amount: agentEarnOf(r, u.id) }));
+    const e = S.earningsOfExecutor(u.id);
+    body.innerHTML = "";
+    body.appendChild(el(`<div class="section-title" style="margin-top:0">💶 Încasările mele</div>`));
+    body.appendChild(el(`
+      <div class="grid cols-2" style="margin-bottom:12px">
+        <div class="card stat"><span class="label">De încasat (în lucru)</span><span class="value" style="color:var(--warn)">${money(e.pending)} <small style="font-size:13px;color:var(--muted,#8aa)">≈ ${leiOf(e.pending)} lei</small></span></div>
+        <div class="card stat"><span class="label">Încasat (eliberat)</span><span class="value brand">${money(e.released)} <small style="font-size:13px;color:var(--muted,#8aa)">≈ ${leiOf(e.released)} lei</small></span></div>
+      </div>`));
+    body.appendChild(el(`<p class="hint" style="margin:0 0 12px">Câștigul tău pe zile (după data lucrării). Navighează pe luni cu ‹ ›.</p>`));
+    body.appendChild(expenseCalendarEl(entries, { totalLabel: "Total câștigat luna aceasta", accent: "brand", rerender }));
+  }
+  function renderMyEarnings(u) { renderEarningsCalendar(u, $("#execBody"), () => renderExecutant(u)); }
 
   // Pontajul Agentului Cleaning: când a început și când a terminat fiecare lucrare
   function renderMyActivity(u) {
@@ -3220,7 +3329,7 @@ body.landing-active { background: var(--h-bg); }
           <div>
             <h1 style="margin:0">🧺 Serviciu lenjerie</h1>
             <p style="margin:4px 0 0"><span class="pill">${esc(biz.type || "—")} · ${esc(biz.name || u.name)}</span> ${rating.count ? starsHtml(rating) : ""}</p>
-            <p style="margin:4px 0 0">Zona ta: <strong style="color:var(--brand)">${esc(u.area)}</strong> · <span class="link" id="changeArea">schimbă zona</span></p>
+            <p style="margin:4px 0 0">Zonele tale: <strong style="color:var(--brand)">${S.areasOf(u).map(esc).join(", ") || "—"}</strong> · <span class="link" id="changeArea">schimbă zonele</span></p>
           </div>
         </div>
       </div>
@@ -3232,6 +3341,7 @@ body.landing-active { background: var(--h-bg); }
       <div class="navtabs">
         <button data-t="available" class="${laundryTab === "available" ? "active" : ""}">🧺 Lenjerie disponibilă (${avail.length})</button>
         <button data-t="jobs" class="${laundryTab === "jobs" ? "active" : ""}">📋 Lucrările mele (${jobs.length})</button>
+        <button data-t="earnings" class="${laundryTab === "earnings" ? "active" : ""}">💶 Încasări</button>
       </div>
       <div id="laundryBody"></div>
     `));
@@ -3239,6 +3349,7 @@ body.landing-active { background: var(--h-bg); }
     $("#changeArea").onclick = () => changeAreaModal(u);
     $("#avatarBtn").onclick = () => openProfile(u);
     const body = $("#laundryBody");
+    if (laundryTab === "earnings") { renderEarningsCalendar(u, body, () => renderSpalatorie(u)); return; }
     const list = laundryTab === "available" ? avail : jobs;
     if (!list.length) {
       body.appendChild(emptyState(
@@ -3340,6 +3451,26 @@ body.landing-active { background: var(--h-bg); }
   }
 
   function changeAreaModal(u) {
+    // Serviciul de lenjerie poate activa în MAI MULTE zone simultan → checkbox-uri
+    if (u.role === "spalatorie") {
+      const current = S.areasOf(u);
+      modal(`
+        <h2>Zonele tale de activitate</h2>
+        <p class="sub">Poți prelua lenjerie din mai multe zone simultan. Bifează zonele dorite.</p>
+        <div class="field"><div class="area-checks">
+          ${C.areas.map(a => `<label class="area-check"><input type="checkbox" value="${esc(a)}" ${current.includes(a) ? "checked" : ""}/> <span>${a}</span></label>`).join("")}
+        </div></div>
+        <div class="btn-row"><button class="btn btn-soft" onclick="_closeModal()">Renunță</button>
+        <button class="btn" style="flex:1" id="saveArea">Salvează</button></div>
+      `);
+      $("#saveArea").onclick = () => {
+        const areas = [...document.querySelectorAll(".area-check input:checked")].map(i => i.value);
+        if (!areas.length) return toast("Alege cel puțin o zonă.", "err");
+        S.updateUser(u.id, { areas, area: areas[0] });
+        closeModal(); toast("Zone actualizate.", "ok"); renderApp();
+      };
+      return;
+    }
     modal(`
       <h2>Schimbă zona de activitate</h2>
       <p class="sub">Vei vedea solicitările din zona selectată.</p>
@@ -3348,7 +3479,7 @@ body.landing-active { background: var(--h-bg); }
       <button class="btn" style="flex:1" id="saveArea">Salvează</button></div>
     `);
     $("#saveArea").onclick = () => {
-      S.updateUser(u.id, { area: $("#newArea").value });
+      S.updateUser(u.id, { area: $("#newArea").value, areas: [$("#newArea").value] });
       closeModal(); toast("Zonă actualizată.", "ok"); renderApp();
     };
   }
@@ -3368,6 +3499,7 @@ body.landing-active { background: var(--h-bg); }
       </div>
       <div class="navtabs">
         <button data-t="overview" class="${adminTab === "overview" ? "active" : ""}">📊 Ansamblu</button>
+        <button data-t="charts" class="${adminTab === "charts" ? "active" : ""}">📈 Statistici</button>
         <button data-t="locations" class="${adminTab === "locations" ? "active" : ""}">📍 Locații${pendingLoc ? ` (${pendingLoc})` : ""}</button>
         <button data-t="products" class="${adminTab === "products" ? "active" : ""}">🛒 Produse</button>
         <button data-t="stock" class="${adminTab === "stock" ? "active" : ""}">📦 Stoc Agenți Cleaning${stockAlerts ? ` <span class="tab-alert">${stockAlerts}</span>` : ""}</button>
@@ -3380,6 +3512,7 @@ body.landing-active { background: var(--h-bg); }
     `));
     app.querySelectorAll(".navtabs button").forEach(b => b.onclick = () => { adminTab = b.dataset.t; renderAdmin(u); });
     if (adminTab === "overview") renderAdminOverview();
+    else if (adminTab === "charts") renderAdminCharts();
     else if (adminTab === "locations") renderAdminLocations(u);
     else if (adminTab === "products") renderAdminProducts(u);
     else if (adminTab === "stock") renderAdminStock(u);
@@ -3620,6 +3753,77 @@ body.landing-active { background: var(--h-bg); }
     if (!others.length) o.appendChild(el(`<p class="hint">Nimic încă.</p>`));
     else others.forEach(l => o.appendChild(locationCard(l, "adminReadonly")));
     body.appendChild(o);
+  }
+
+  /* Panou de statistici grafice (admin): cifra de afaceri, comision platformă, comision parteneri */
+  function renderAdminCharts() {
+    const body = $("#admBody");
+    const rs = S.requests().filter(r => r.status !== S.STATUS.NOU && r.status !== S.STATUS.ANULAT);
+    const M = {};
+    let revenue = 0, commission = 0, partners = 0;
+    rs.forEach(r => {
+      const b = S.breakdown(r);
+      let p = 0;
+      if (r.executorId) p += b.cleaningPayout + b.consExecutantPayout;
+      if (b.linenTaken) p += b.linenPayout;
+      if (b.consLaundryPayout > 0) p += b.consLaundryPayout;
+      revenue += b.total; commission += b.commission; partners += p;
+      const k = String(r.date || "").slice(0, 7);
+      if (k) { (M[k] = M[k] || { rev: 0, com: 0, part: 0 }); M[k].rev += b.total; M[k].com += b.commission; M[k].part += p; }
+    });
+    const retained = Math.max(0, Math.round((revenue - commission - partners) * 100) / 100);
+    const now = new Date();
+    const months = [];
+    for (let i = 5; i >= 0; i--) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); months.push({ key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, label: CAL_MONTHS[d.getMonth()].slice(0, 3) }); }
+    const maxRev = Math.max(1, ...months.map(m => (M[m.key] || {}).rev || 0));
+    const W = 580, H = 230, pad = 30, gap = (W - pad * 2) / months.length, bw = gap * 0.5;
+    const bars = months.map((m, i) => {
+      const d = M[m.key] || { rev: 0, com: 0, part: 0 };
+      const ret = Math.max(0, d.rev - d.com - d.part);
+      const x = pad + i * gap + (gap - bw) / 2;
+      let acc = 0; const segs = [];
+      [["#22d3ee", d.com], ["#f59e0b", d.part], ["#64748b", ret]].forEach(([c, val]) => {
+        const h = (val / maxRev) * (H - pad * 2);
+        if (h > 0.5) { segs.push(`<rect x="${x.toFixed(1)}" y="${(H - pad - acc - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${c}" rx="2"/>`); acc += h; }
+      });
+      return segs.join("") +
+        `<text x="${(x + bw / 2).toFixed(1)}" y="${H - pad + 14}" text-anchor="middle" font-size="11" fill="#94a3b8">${m.label}</text>` +
+        (d.rev > 0 ? `<text x="${(x + bw / 2).toFixed(1)}" y="${(H - pad - acc - 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="#cbd5e1">${leiOf(d.rev)}</text>` : "");
+    }).join("");
+    const tot = Math.max(1, revenue);
+    const pc = v => Math.round(v / tot * 1000) / 10;
+    body.innerHTML = "";
+    body.appendChild(el(`
+      <div class="grid cols-4">
+        <div class="card stat"><span class="label">💰 Cifra de afaceri</span><span class="value">${money(revenue)} <small style="font-size:13px;color:var(--muted,#8aa)">≈ ${leiOf(revenue)} lei</small></span></div>
+        <div class="card stat"><span class="label">🏦 Încasări (avans)</span><span class="value">${money(revenue)} <small style="font-size:13px;color:var(--muted,#8aa)">≈ ${leiOf(revenue)} lei</small></span></div>
+        <div class="card stat"><span class="label">🏛️ Comision platformă</span><span class="value brand">${money(commission)} <small style="font-size:13px;color:var(--muted,#8aa)">≈ ${leiOf(commission)} lei</small></span></div>
+        <div class="card stat"><span class="label">🤝 Comision către parteneri</span><span class="value" style="color:var(--warn)">${money(partners)} <small style="font-size:13px;color:var(--muted,#8aa)">≈ ${leiOf(partners)} lei</small></span></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="section-title" style="margin-top:0">Cifra de afaceri pe luni (lei)</div>
+        <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-width:640px">${bars}</svg>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px;margin-top:6px">
+          <span><span style="display:inline-block;width:12px;height:12px;background:#22d3ee;border-radius:3px;vertical-align:-1px"></span> Comision platformă</span>
+          <span><span style="display:inline-block;width:12px;height:12px;background:#f59e0b;border-radius:3px;vertical-align:-1px"></span> Către parteneri</span>
+          <span><span style="display:inline-block;width:12px;height:12px;background:#64748b;border-radius:3px;vertical-align:-1px"></span> Reținut platformă</span>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="section-title" style="margin-top:0">Cum se împarte cifra de afaceri</div>
+        <div style="display:flex;height:34px;border-radius:8px;overflow:hidden;margin:8px 0 10px;background:rgba(255,255,255,.06)">
+          <div style="width:${pc(commission)}%;background:#22d3ee"></div>
+          <div style="width:${pc(partners)}%;background:#f59e0b"></div>
+          <div style="width:${pc(retained)}%;background:#64748b"></div>
+        </div>
+        <div style="font-size:13.5px;line-height:1.9">
+          🏛️ <strong>Comision platformă</strong>: ${money(commission)} (${pc(commission)}%)<br>
+          🤝 <strong>Comision către parteneri</strong> (Agenți + lenjerie): ${money(partners)} (${pc(partners)}%)<br>
+          🏦 <strong>Reținut platformă</strong> (nealocat): ${money(retained)} (${pc(retained)}%)
+        </div>
+      </div>
+      ${revenue === 0 ? `<p class="hint" style="margin-top:12px">Încă nu există încasări. Graficele se populează pe măsură ce clienții plătesc solicitări.</p>` : ""}
+    `));
   }
 
   function renderAdminOverview() {
@@ -4348,6 +4552,26 @@ body.landing-active { background: var(--h-bg); }
     ["🧺 La spălătorie", "🧺 At the laundry", "🧺 धुलाइमा"],
     ["📦 La Agent Cleaning", "📦 At the Cleaning Agent", "📦 Cleaning Agent सँग"],
     ["Total seturi în circuit", "Total sets in circuit", "चक्रमा जम्मा सेट"],
+    ["💶 Cheltuieli", "💶 Expenses", "💶 खर्च"],
+    ["💶 Cheltuielile mele", "💶 My expenses", "💶 मेरो खर्च"],
+    ["💶 Încasări", "💶 Earnings", "💶 आम्दानी"],
+    ["💶 Încasările mele", "💶 My earnings", "💶 मेरो आम्दानी"],
+    ["De încasat (în lucru)", "To collect (in progress)", "उठाउन बाँकी (प्रगतिमा)"],
+    ["Încasat (eliberat)", "Collected (released)", "उठाइयो (जारी)"],
+    ["Total cheltuit luna aceasta", "Total spent this month", "यो महिना जम्मा खर्च"],
+    ["Total câștigat luna aceasta", "Total earned this month", "यो महिना जम्मा आम्दानी"],
+    ["📈 Statistici", "📈 Statistics", "📈 तथ्याङ्क"],
+    ["💰 Cifra de afaceri", "💰 Turnover", "💰 कारोबार"],
+    ["🏦 Încasări (avans)", "🏦 Collected (advance)", "🏦 सङ्कलन (अग्रिम)"],
+    ["🏛️ Comision platformă", "🏛️ Platform commission", "🏛️ प्लेटफर्म कमिसन"],
+    ["🤝 Comision către parteneri", "🤝 Paid to partners", "🤝 साझेदारलाई भुक्तानी"],
+    ["Cifra de afaceri pe luni (lei)", "Monthly turnover (lei)", "मासिक कारोबार (lei)"],
+    ["Cum se împarte cifra de afaceri", "How turnover is split", "कारोबार कसरी बाँडिन्छ"],
+    ["Zonele tale de activitate", "Your activity areas", "तपाईंका गतिविधि क्षेत्रहरू"],
+    ["Poți prelua lenjerie din mai multe zone simultan. Bifează zonele dorite.", "You can take linen from several areas at once. Tick the areas you want.", "तपाईं एकैपटक धेरै क्षेत्रबाट बेडसिट लिन सक्नुहुन्छ। इच्छित क्षेत्रहरू छान्नुहोस्।"],
+    ["schimbă zonele", "change areas", "क्षेत्रहरू परिवर्तन गर्नुहोस्"],
+    ["Zone actualizate.", "Areas updated.", "क्षेत्रहरू अद्यावधिक भयो।"],
+    ["Alege cel puțin o zonă.", "Choose at least one area.", "कम्तीमा एक क्षेत्र छान्नुहोस्।"],
     ["Link copiat în clipboard!", "Link copied to clipboard!", "लिङ्क क्लिपबोर्डमा प्रतिलिपि भयो!"],
     ["Ora început", "Start time", "सुरु समय"],
     ["Curățenie", "Cleaning", "सफाइ"],
