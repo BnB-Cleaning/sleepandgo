@@ -1880,9 +1880,12 @@ body.landing-active { background: var(--h-bg); }
           </div>
           <div class="hint" style="margin:-6px 0 4px">Telefonul e vizibil doar între Agent Cleaning și serviciul de lenjerie, pentru coordonarea ridicării.</div>
           <div class="field">
-            <label>Zona în care activez</label>
-            <select name="area">${C.areas.map(a => `<option>${a}</option>`).join("")}</select>
-            <div class="hint">Vei vedea doar solicitările din această zonă.</div>
+            <label>${regRole === "spalatorie" ? "Zonele în care activez" : "Zona în care activez"}</label>
+            ${regRole === "spalatorie"
+              ? `<div class="area-checks">${C.areas.map(a => `<label class="area-check"><input type="checkbox" name="areaMulti" value="${esc(a)}"/> <span>${a}</span></label>`).join("")}</div>
+                 <div class="hint">Bifează mai multe zone — preiei lenjerie din toate.</div>`
+              : `<select name="area">${C.areas.map(a => `<option>${a}</option>`).join("")}</select>
+                 <div class="hint">Vei vedea doar solicitările din această zonă.</div>`}
           </div>
         </div>
         <button class="btn btn-block" type="submit">Creează cont</button>
@@ -1900,8 +1903,17 @@ body.landing-active { background: var(--h-bg); }
       const f = new FormData(e.target);
       const payload = {
         name: f.get("name"), email: f.get("email"), password: f.get("password"),
-        role: regRole, area: f.get("area"),
+        role: regRole,
       };
+      // Serviciul de lenjerie poate alege MAI MULTE zone; celelalte roluri — una singură
+      let laundryAreas = null;
+      if (regRole === "spalatorie") {
+        laundryAreas = [...e.target.querySelectorAll('input[name="areaMulti"]:checked')].map(i => i.value);
+        if (!laundryAreas.length) return toast("Alege cel puțin o zonă.", "err");
+        payload.area = laundryAreas[0];
+      } else {
+        payload.area = f.get("area");
+      }
       if (regRole === "executant" || regRole === "spalatorie") {
         payload.business = {
           type: regBiz, name: f.get("bizName"), cui: f.get("cui"),
@@ -1912,6 +1924,8 @@ body.landing-active { background: var(--h-bg); }
       }
       const res = await S.register(payload);
       if (!res.ok) return toast(res.error, "err");
+      // persistă lista de zone pentru Serviciul de lenjerie
+      if (laundryAreas && res.user) { S.updateUser(res.user.id, { areas: laundryAreas, area: laundryAreas[0] }); await S.flush(); }
       toast("Cont creat cu succes!", "ok");
       renderApp();
     };
@@ -4570,6 +4584,8 @@ body.landing-active { background: var(--h-bg); }
     ["Zonele tale de activitate", "Your activity areas", "तपाईंका गतिविधि क्षेत्रहरू"],
     ["Poți prelua lenjerie din mai multe zone simultan. Bifează zonele dorite.", "You can take linen from several areas at once. Tick the areas you want.", "तपाईं एकैपटक धेरै क्षेत्रबाट बेडसिट लिन सक्नुहुन्छ। इच्छित क्षेत्रहरू छान्नुहोस्।"],
     ["schimbă zonele", "change areas", "क्षेत्रहरू परिवर्तन गर्नुहोस्"],
+    ["Zonele în care activez", "The areas I operate in", "म काम गर्ने क्षेत्रहरू"],
+    ["Bifează mai multe zone — preiei lenjerie din toate.", "Tick several areas — you take linen from all of them.", "धेरै क्षेत्र छान्नुहोस् — सबैबाट बेडसिट लिनुहुन्छ।"],
     ["Zone actualizate.", "Areas updated.", "क्षेत्रहरू अद्यावधिक भयो।"],
     ["Alege cel puțin o zonă.", "Choose at least one area.", "कम्तीमा एक क्षेत्र छान्नुहोस्।"],
     ["Link copiat în clipboard!", "Link copied to clipboard!", "लिङ्क क्लिपबोर्डमा प्रतिलिपि भयो!"],
