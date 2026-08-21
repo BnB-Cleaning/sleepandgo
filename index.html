@@ -2044,6 +2044,17 @@ body.landing-active { background: var(--h-bg); }
     sw.onchange = () => { activeRole = sw.value; window.scrollTo(0, 0); renderApp(); };
   }
 
+  // Un prestator (Agent Cleaning / Serviciu lenjerie) își activează singur celălalt rol de prestator
+  // (folosesc aceleași date de firmă + zone deja verificate). Comută apoi panoul din bara de sus.
+  function addRoleSelf(u, role, label) {
+    const roles = S.rolesOf(u);
+    if (roles.includes(role)) return;
+    S.updateUser(u.id, { roles: [...roles, role] });
+    activeRole = role;   // sări direct pe noul panou
+    toast(`Ai activat și rolul de ${label}. Poți comuta panoul din bara de sus.`, "ok");
+    renderApp();
+  }
+
   /* ---------- Profil (poză de profil) ---------- */
   function openProfile(u) {
     const rating = u.role === "executant" ? S.ratingOf(u.id) : null;
@@ -3318,6 +3329,7 @@ body.landing-active { background: var(--h-bg); }
               ${rating.count ? starsHtml(rating) : `<span class="hint" style="display:inline">fără recenzii încă</span>`}
             </p>
             <p style="margin:4px 0 0">${S.areasOf(u).length > 1 ? "Zonele tale" : "Zona ta"}: <strong style="color:var(--brand)">${S.areasOf(u).map(esc).join(", ") || "—"}</strong> · <span class="link" id="changeArea">schimbă zona</span></p>
+            ${!S.hasRole(u, "spalatorie") ? `<p style="margin:6px 0 0"><span class="link" id="addLaundryRole">➕ Activează și rolul de Serviciu lenjerie</span></p>` : ""}
           </div>
         </div>
       </div>
@@ -3337,6 +3349,7 @@ body.landing-active { background: var(--h-bg); }
     `));
     app.querySelectorAll(".navtabs button").forEach(b => b.onclick = () => { execTab = b.dataset.t; renderExecutant(u); });
     $("#changeArea").onclick = () => changeAreaModal(u);
+    if ($("#addLaundryRole")) $("#addLaundryRole").onclick = () => addRoleSelf(u, "spalatorie", "Serviciu lenjerie");
     $("#avatarBtn").onclick = () => openProfile(u);
     if (execTab === "available") renderAvailable(u, avail);
     else if (execTab === "stock") renderMyStock(u);
@@ -3443,6 +3456,7 @@ body.landing-active { background: var(--h-bg); }
             <h1 style="margin:0">🧺 Serviciu lenjerie</h1>
             <p style="margin:4px 0 0"><span class="pill">${esc(biz.type || "—")} · ${esc(biz.name || u.name)}</span> ${rating.count ? starsHtml(rating) : ""}</p>
             <p style="margin:4px 0 0">Zonele tale: <strong style="color:var(--brand)">${S.areasOf(u).map(esc).join(", ") || "—"}</strong> · <span class="link" id="changeArea">schimbă zonele</span></p>
+            ${!S.hasRole(u, "executant") ? `<p style="margin:6px 0 0"><span class="link" id="addCleanRole">➕ Activează și rolul de Agent Cleaning</span></p>` : ""}
           </div>
         </div>
       </div>
@@ -3460,6 +3474,7 @@ body.landing-active { background: var(--h-bg); }
     `));
     app.querySelectorAll(".navtabs button").forEach(b => b.onclick = () => { laundryTab = b.dataset.t; renderSpalatorie(u); });
     $("#changeArea").onclick = () => changeAreaModal(u);
+    if ($("#addCleanRole")) $("#addCleanRole").onclick = () => addRoleSelf(u, "executant", "Agent Cleaning");
     $("#avatarBtn").onclick = () => openProfile(u);
     const body = $("#laundryBody");
     if (laundryTab === "earnings") { renderEarningsCalendar(u, body, () => renderSpalatorie(u)); return; }
@@ -4700,6 +4715,8 @@ body.landing-active { background: var(--h-bg); }
     ["🏠 Solicitanți", "🏠 Clients", "🏠 ग्राहकहरू"],
     ["🧹 Agenți Cleaning", "🧹 Cleaning Agents", "🧹 Cleaning Agent हरू"],
     ["🧺 Serviciu lenjerie", "🧺 Linen service", "🧺 बेडसिट सेवा"],
+    ["➕ Activează și rolul de Serviciu lenjerie", "➕ Also enable the Linen service role", "➕ बेडसिट सेवा भूमिका पनि सक्रिय गर्नुहोस्"],
+    ["➕ Activează și rolul de Agent Cleaning", "➕ Also enable the Cleaning Agent role", "➕ Cleaning Agent भूमिका पनि सक्रिय गर्नुहोस्"],
     ["Distribuie", "Share", "सेयर गर्नुहोस्"],
     ["Trimite linkul prietenilor sau partenerilor.", "Send the link to friends or partners.", "साथी वा साझेदारलाई लिङ्क पठाउनुहोस्।"],
     ["🔗 Copiază link", "🔗 Copy link", "🔗 लिङ्क प्रतिलिपि गर्नुहोस्"],
