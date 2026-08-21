@@ -406,6 +406,10 @@ a.pill.contact:hover { background: var(--brand); color: #fff; }
 .share-opt.em { background: #EA4335; }
 .share-opt.copy { background: #475569; grid-column: 1 / -1; }
 
+/* ===== Comutator de panou (roluri multiple) ===== */
+.role-switch { background: var(--card); color: var(--ink, #e5e7eb); border: 1px solid var(--brand, #22d3ee); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 700; cursor: pointer; margin-right: 10px; }
+.role-switch:focus { outline: none; box-shadow: 0 0 0 3px rgba(34,211,238,.25); }
+
 /* =========================================================
    Sleep & Go Cleaning — HOME / LANDING
    Brand preluat de pe sleepandgocleaning.com:
@@ -1118,7 +1122,7 @@ body.landing-active { background: var(--h-bg); }
       if (r.executorId === executorId) {
         // Agentul Cleaning de curățenie o preia direct (inclusiv după ce a marcat curățenia gata)
         if (![STATUS.ACCEPTAT, STATUS.IN_PROGRES, STATUS.FINALIZAT].includes(r.status)) return { ok: false };
-      } else if (usr && usr.role === "spalatorie") {
+      } else if (usr && this.hasRole(usr, "spalatorie")) {
         // serviciul de lenjerie o preia doar dacă Agentul Cleaning de curățenie a refuzat, în zona lui
         if (!r.linenDeclined || !this.areasOf(usr).includes(r.area)) return { ok: false };
         if (r.status === STATUS.ANULAT || r.status === STATUS.NOU) return { ok: false };
@@ -1252,8 +1256,11 @@ body.landing-active { background: var(--h-bg); }
     userById(id) { return db.users.find(u => u.id === id) || null; },
     // zonele în care activează un utilizator (Serviciul de lenjerie poate avea mai multe)
     areasOf(u) { const x = u && u.areas; return (Array.isArray(x) && x.length) ? x : (u && u.area ? [u.area] : []); },
+    // rolurile unui utilizator (poate avea mai multe: ex. Solicitant + Serviciu lenjerie)
+    rolesOf(u) { const x = u && u.roles; return (Array.isArray(x) && x.length) ? x : (u && u.role ? [u.role] : []); },
+    hasRole(u, r) { return this.rolesOf(u).includes(r); },
     // există cel puțin un Agent Cleaning (curățenie) activ în zonă?
-    hasActiveExecutorInArea(area) { return db.users.some(u => u.role === "executant" && this.areasOf(u).includes(area)); },
+    hasActiveExecutorInArea(area) { return db.users.some(u => this.hasRole(u, "executant") && this.areasOf(u).includes(area)); },
     setAvatar(id, dataUrl) {
       const u = db.users.find(x => x.id === id); if (!u) return;
       u.avatar = dataUrl; save(db); return u;
@@ -1824,6 +1831,7 @@ body.landing-active { background: var(--h-bg); }
   let regBiz = "SRL";
   let landing = true;
   let landingView = "home";  // "home" | "executant" | "spalatorie"
+  let activeRole = null;     // panoul activ când utilizatorul are mai multe roluri
 
   // Rutare pe URL: linkuri directe către fiecare landing (serverul servește index.html pe orice cale)
   const LANDING_PATHS = { home: "/", executant: "/agenti-cleaning", spalatorie: "/serviciu-lenjerie" };
@@ -2003,7 +2011,11 @@ body.landing-active { background: var(--h-bg); }
     }
     document.body.classList.remove("landing-active");
     topbar.hidden = false;
-    $("#roleBadge").textContent = roleLabel[u.role];
+    // rol activ: dacă are mai multe roluri, folosim panoul selectat (implicit primul)
+    const roles = S.rolesOf(u);
+    if (!activeRole || !roles.includes(activeRole)) activeRole = roles[0] || "solicitant";
+    renderRoleSwitcher(u, roles);
+    $("#roleBadge").textContent = roleLabel[activeRole];
     $("#userName").textContent = u.name;
     // avatar de profil în topbar (click → profil / schimbă poza)
     let av = $("#topAvatar");
@@ -2011,12 +2023,25 @@ body.landing-active { background: var(--h-bg); }
     av.innerHTML = avatarHtml(u, 34);
     av.style.cursor = "pointer";
     av.onclick = () => openProfile(u);
-    $("#logoutBtn").onclick = async () => { await S.logout(); toast("Te-ai deconectat.", ""); landing = true; renderHome(); };
+    $("#logoutBtn").onclick = async () => { await S.logout(); activeRole = null; toast("Te-ai deconectat.", ""); landing = true; renderHome(); };
 
-    if (u.role === "admin") return renderAdmin(u);
-    if (u.role === "executant") return renderExecutant(u);
-    if (u.role === "spalatorie") return renderSpalatorie(u);
+    if (activeRole === "admin") return renderAdmin(u);
+    if (activeRole === "executant") return renderExecutant(u);
+    if (activeRole === "spalatorie") return renderSpalatorie(u);
     return renderSolicitant(u);
+  }
+
+  /* Comutator de panou pentru utilizatorii cu roluri multiple (ex. Solicitant + Serviciu lenjerie) */
+  function renderRoleSwitcher(u, roles) {
+    let sw = $("#roleSwitch");
+    if (!roles || roles.length <= 1) { if (sw) sw.remove(); return; }
+    if (!sw) {
+      sw = el(`<select id="roleSwitch" class="role-switch" title="Comută panoul"></select>`);
+      const right = $(".topbar-right"); const badge = $("#roleBadge");
+      if (right && badge) right.insertBefore(sw, badge); else if (right) right.prepend(sw);
+    }
+    sw.innerHTML = roles.map(r => `<option value="${r}" ${r === activeRole ? "selected" : ""}>${roleLabel[r]}</option>`).join("");
+    sw.onchange = () => { activeRole = sw.value; window.scrollTo(0, 0); renderApp(); };
   }
 
   /* ---------- Profil (poză de profil) ---------- */
@@ -4025,7 +4050,7 @@ body.landing-active { background: var(--h-bg); }
                 ${rt && rt.count ? `<div style="margin-top:4px">${starsHtml(rt)}</div>` : ""}
               </div>
             </div>
-            <span class="role-badge">${roleLabel[usr.role]}</span>
+            <span class="role-badge">${S.rolesOf(usr).map(r => roleLabel[r]).join(" · ")}</span>
           </div>
           ${usr.business ? `
             <div class="req-notes">
@@ -4048,7 +4073,7 @@ body.landing-active { background: var(--h-bg); }
     ];
     const all = S.users();
     groups.forEach(([role, label], i) => {
-      const list = all.filter(x => x.role === role);
+      const list = all.filter(x => S.hasRole(x, role));
       if (!list.length) return;
       body.appendChild(el(`<div class="section-title"${i === 0 ? ' style="margin-top:0"' : ""}>${label} (${list.length})</div>`));
       const wrap = el(`<div class="grid cols-2" style="margin-bottom:22px"></div>`);
@@ -4062,13 +4087,16 @@ body.landing-active { background: var(--h-bg); }
      Pentru Agent Cleaning / Serviciu lenjerie, datele de firmă și zona sunt OBLIGATORII. */
   function adminEditUserModal(usr) {
     if (!usr) return;
-    const roles = [["solicitant", "Solicitant"], ["executant", "Agent Cleaning"], ["spalatorie", "Serviciu lenjerie"], ["admin", "Administrator"]];
+    const ROLES = [["solicitant", "Solicitant"], ["executant", "Agent Cleaning"], ["spalatorie", "Serviciu lenjerie"], ["admin", "Administrator"]];
     const b = usr.business || {};
+    const current = S.rolesOf(usr);
     modal(`
       <h2>Editează utilizator</h2>
       <p class="sub">${esc(usr.name)} · ${esc(usr.email)}</p>
-      <div class="field"><label>Categorie (rol)</label>
-        <select id="euRole">${roles.map(r => `<option value="${r[0]}" ${usr.role === r[0] ? "selected" : ""}>${r[1]}</option>`).join("")}</select>
+      <div class="field"><label>Categorii (roluri) — poți alege mai multe</label>
+        <div class="area-checks" id="euRoles">
+          ${ROLES.map(r => `<label class="area-check"><input type="checkbox" value="${r[0]}" ${current.includes(r[0]) ? "checked" : ""}/> <span>${r[1]}</span></label>`).join("")}
+        </div>
       </div>
       <div id="euBiz">
         <div class="field"><label>Zone de activitate <span id="euAreaHint" style="color:var(--muted,#8aa);font-weight:400"></span></label>
@@ -4088,46 +4116,50 @@ body.landing-active { background: var(--h-bg); }
         <button class="btn" style="flex:1" id="euSave">Salvează</button>
       </div>
     `);
-    const roleSel = $("#euRole"), bizWrap = $("#euBiz");
-    // aplică limita de zone după rol (agent max 2, lenjerie nelimitat)
+    const bizWrap = $("#euBiz");
+    const selectedRoles = () => [...document.querySelectorAll("#euRoles input:checked")].map(i => i.value);
+    const needsBiz = () => selectedRoles().some(r => r === "executant" || r === "spalatorie");
+    const zoneMax = () => { const rs = selectedRoles(); return rs.includes("spalatorie") ? 99 : (rs.includes("executant") ? 4 : 1); };
     const applyAreaLimit = () => {
-      const max = maxAreasFor(roleSel.value);
+      const max = zoneMax();
       const boxes = [...document.querySelectorAll("#euAreas input")];
-      if (max < 99) { const checked = boxes.filter(b => b.checked); if (checked.length > max) checked.slice(max).forEach(b => (b.checked = false)); }
-      const n = boxes.filter(b => b.checked).length;
-      boxes.forEach(b => { if (!b.checked) b.disabled = max < 99 && n >= max; });
-      const hint = $("#euAreaHint"); if (hint) hint.textContent = roleSel.value === "executant" ? `(max ${maxAreasFor("executant")})` : (roleSel.value === "spalatorie" ? "(mai multe)" : "");
+      if (max < 99) { const checked = boxes.filter(x => x.checked); if (checked.length > max) checked.slice(max).forEach(x => (x.checked = false)); }
+      const n = boxes.filter(x => x.checked).length;
+      boxes.forEach(x => { if (!x.checked) x.disabled = max < 99 && n >= max; });
+      const hint = $("#euAreaHint"); if (hint) hint.textContent = selectedRoles().includes("spalatorie") ? "(mai multe)" : (selectedRoles().includes("executant") ? "(max 4)" : "");
     };
-    document.querySelectorAll("#euAreas input").forEach(b => b.addEventListener("change", applyAreaLimit));
-    const toggleBiz = () => { bizWrap.style.display = ["executant", "spalatorie"].includes(roleSel.value) ? "" : "none"; applyAreaLimit(); };
-    roleSel.onchange = toggleBiz; toggleBiz();
+    const refresh = () => { bizWrap.style.display = needsBiz() ? "" : "none"; applyAreaLimit(); };
+    document.querySelectorAll("#euRoles input").forEach(x => x.addEventListener("change", refresh));
+    document.querySelectorAll("#euAreas input").forEach(x => x.addEventListener("change", applyAreaLimit));
+    refresh();
     $("#euSave").onclick = () => {
-      const role = roleSel.value;
-      // protecție: nu lăsa fără niciun admin
-      if (usr.role === "admin" && role !== "admin" && S.users().filter(x => x.role === "admin").length <= 1)
-        return toast("Nu poți schimba singurul administrator.", "err");
-      const patch = { role };
-      if (["executant", "spalatorie"].includes(role)) {
+      const rs = selectedRoles();
+      if (!rs.length) return toast("Alege cel puțin un rol.", "err");
+      // protecție: nu lăsa platforma fără administrator
+      if (S.hasRole(usr, "admin") && !rs.includes("admin") && S.users().filter(x => S.hasRole(x, "admin")).length <= 1)
+        return toast("Nu poți lăsa platforma fără administrator.", "err");
+      const order = ["solicitant", "executant", "spalatorie", "admin"];
+      const primary = order.find(r => rs.includes(r)) || rs[0];
+      const patch = { roles: rs, role: primary };
+      if (needsBiz()) {
         const business = {
-          type: $("#euType").value,
-          name: ($("#euName").value || "").trim(),
-          cui: ($("#euCui").value || "").trim(),
-          regCom: ($("#euReg").value || "").trim(),
-          iban: ($("#euIban").value || "").trim(),
+          type: $("#euType").value, name: ($("#euName").value || "").trim(), cui: ($("#euCui").value || "").trim(),
+          regCom: ($("#euReg").value || "").trim(), iban: ($("#euIban").value || "").trim(),
         };
         const areas = [...document.querySelectorAll("#euAreas input:checked")].map(i => i.value);
         const phone = ($("#euPhone").value || "").trim();
-        const max = maxAreasFor(role);
+        const max = zoneMax();
         if (!["PFA", "PFI", "SRL"].includes(business.type)) return toast("Alege forma juridică (PFA/PFI/SRL).", "err");
         if (!business.name || !business.cui || !business.iban) return toast("Completează firma, CUI/CIF și IBAN.", "err");
         if (!phone) return toast("Completează telefonul.", "err");
         if (!areas.length) return toast("Alege cel puțin o zonă.", "err");
-        if (areas.length > max) return toast(`Maxim ${max} zone pentru acest rol.`, "err");
+        if (areas.length > max) return toast(`Maxim ${max} zone.`, "err");
         patch.business = business; patch.areas = areas; patch.area = areas[0]; patch.phone = phone;
       } else {
         patch.business = null; patch.area = null; patch.areas = null;
       }
       S.updateUser(usr.id, patch);
+      const me = S.currentUser(); if (me && me.id === usr.id) activeRole = null;   // dacă m-am editat pe mine, resetez panoul
       closeModal(); toast("Utilizator actualizat.", "ok"); renderApp();
     };
   }
