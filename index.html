@@ -681,6 +681,10 @@ body.landing-active { background: var(--h-bg); }
 
 @media (prefers-reduced-motion: reduce) { .home * { transition: none !important; } }
 
+/* ===== Zone deservite (home) ===== */
+.zone-chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 880px; margin: 4px auto 0; }
+.zone-chip { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; border-radius: 999px; padding: 8px 15px; font-weight: 600; font-size: 14px; white-space: nowrap; }
+
 </style>
 
   <header class="topbar" id="topbar" hidden>
@@ -2056,6 +2060,8 @@ body.landing-active { background: var(--h-bg); }
     const offPeak = basePrice;
     const peakPrice = Math.round(basePrice * (100 + C.schedule.peakSurchargePct)) / 100;
     const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    // zonele în care există cel puțin un Agent Cleaning activ
+    const coveredAreas = C.areas.filter(a => S.hasActiveExecutorInArea(a));
     const services = [
       ["🛏️", "Curățenie regim hotelier", "Turnover complet între check-out și check-in: curățenie, schimbat lenjeria, pregătit locația pentru următorii oaspeți."],
       ["🧻", "Alimentare consumabile", "Hârtie igienică, apă, cafea, bomboane și produse de curățenie — reaprovizionare la fiecare intervenție."],
@@ -2081,6 +2087,7 @@ body.landing-active { background: var(--h-bg); }
           </a>
           <nav class="h-nav">
             <a data-scroll="servicii">Servicii</a>
+            <a data-scroll="zone">Zone</a>
             <a data-scroll="inchiriere">Închiriere lenjerii</a>
             <a data-scroll="preturi">Prețuri</a>
             <button class="h-btn ghost h-share" type="button" data-share>🔗 Distribuie</button>
@@ -2101,7 +2108,7 @@ body.landing-active { background: var(--h-bg); }
             <div class="h-trust">
               <div class="item"><span class="n">de la ${offPeak} €<span style="font-size:15px">/m²</span></span><span class="l">în afara orelor de vârf</span></div>
               <div class="item"><span class="n">8–19</span><span class="l">program zilnic</span></div>
-              <div class="item"><span class="n">12+</span><span class="l">zone deservite</span></div>
+              <div class="item"><span class="n">${coveredAreas.length || "—"}</span><span class="l">zone cu agenți activi</span></div>
             </div>
           </div>
           <div class="h-preview">
@@ -2137,6 +2144,18 @@ body.landing-active { background: var(--h-bg); }
               </div>
             </div>
           </div>
+        </div></section>
+
+        <!-- Zone deservite -->
+        <section class="h-section soft" id="zone"><div class="wrap">
+          <div class="h-section-head">
+            <div class="eyebrow">Acoperire</div>
+            <h2>Zone cu Agenți Cleaning disponibili</h2>
+            <p>${coveredAreas.length ? `Avem agenți activi în <strong>${coveredAreas.length}</strong> ${coveredAreas.length === 1 ? "zonă" : "zone"}. Alege locația în zona ta și trimite o solicitare.` : "În curând adăugăm agenți în zona ta. Înregistrează-ți locația — o activăm imediat ce apare un Agent Cleaning."}</p>
+          </div>
+          ${coveredAreas.length
+            ? `<div class="zone-chips">${coveredAreas.map(a => `<span class="zone-chip">📍 ${esc(a)}</span>`).join("")}</div>`
+            : ""}
         </div></section>
 
         <!-- Cum funcționează -->
@@ -3989,10 +4008,11 @@ body.landing-active { background: var(--h-bg); }
 
   function renderAdminUsers() {
     const body = $("#admBody");
-    const wrap = el(`<div class="grid cols-2"></div>`);
-    S.users().forEach(usr => {
+    body.innerHTML = "";
+    const cardHtml = (usr) => {
       const rt = usr.role === "executant" ? S.ratingOf(usr.id) : null;
-      wrap.appendChild(el(`
+      const areas = S.areasOf(usr);
+      return `
         <div class="card">
           <div class="req-top">
             <div style="display:flex;align-items:center;gap:12px">
@@ -4011,15 +4031,29 @@ body.landing-active { background: var(--h-bg); }
               CUI/CIF: ${esc(usr.business.cui)}${usr.business.regCom ? " · Reg. Com.: " + esc(usr.business.regCom) : ""}<br>
               IBAN: ${esc(usr.business.iban)}
             </div>` : ""}
-          ${usr.area ? `<div class="req-notes">📍 ${esc(usr.area)}</div>` : ""}
+          ${areas.length ? `<div class="req-notes">📍 ${areas.map(esc).join(", ")}</div>` : ""}
           <div style="margin-top:10px;text-align:right">
             <button class="btn btn-soft" style="padding:6px 14px" data-edit="${usr.id}">✏️ Editează</button>
           </div>
-        </div>
-      `));
+        </div>`;
+    };
+    // grupare pe categorii (rol)
+    const groups = [
+      ["admin", "🛡️ Administratori"],
+      ["solicitant", "🏠 Solicitanți"],
+      ["executant", "🧹 Agenți Cleaning"],
+      ["spalatorie", "🧺 Serviciu lenjerie"],
+    ];
+    const all = S.users();
+    groups.forEach(([role, label], i) => {
+      const list = all.filter(x => x.role === role);
+      if (!list.length) return;
+      body.appendChild(el(`<div class="section-title"${i === 0 ? ' style="margin-top:0"' : ""}>${label} (${list.length})</div>`));
+      const wrap = el(`<div class="grid cols-2" style="margin-bottom:22px"></div>`);
+      list.forEach(x => wrap.appendChild(el(cardHtml(x))));
+      body.appendChild(wrap);
     });
-    body.appendChild(wrap);
-    wrap.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => adminEditUserModal(S.userById(b.dataset.edit)));
+    body.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => adminEditUserModal(S.userById(b.dataset.edit)));
   }
 
   /* Admin: editează categoria (rolul) + firma/IBAN + zona unui utilizator.
@@ -4625,6 +4659,13 @@ body.landing-active { background: var(--h-bg); }
     ["Devino serviciu de lenjerie", "Become a linen service", "बेडसिट सेवा बन्नुहोस्"],
     ["Preiei rute din zona ta după înregistrare.", "Take routes in your area after signing up.", "दर्ता पछि आफ्नो क्षेत्रका रूटहरू लिनुहोस्।"],
     ["🔗 Distribuie", "🔗 Share", "🔗 सेयर गर्नुहोस्"],
+    ["Zone", "Areas", "क्षेत्रहरू"],
+    ["Acoperire", "Coverage", "कभरेज"],
+    ["Zone cu Agenți Cleaning disponibili", "Areas with available Cleaning Agents", "उपलब्ध Cleaning Agent भएका क्षेत्रहरू"],
+    ["🛡️ Administratori", "🛡️ Administrators", "🛡️ प्रशासकहरू"],
+    ["🏠 Solicitanți", "🏠 Clients", "🏠 ग्राहकहरू"],
+    ["🧹 Agenți Cleaning", "🧹 Cleaning Agents", "🧹 Cleaning Agent हरू"],
+    ["🧺 Serviciu lenjerie", "🧺 Linen service", "🧺 बेडसिट सेवा"],
     ["Distribuie", "Share", "सेयर गर्नुहोस्"],
     ["Trimite linkul prietenilor sau partenerilor.", "Send the link to friends or partners.", "साथी वा साझेदारलाई लिङ्क पठाउनुहोस्।"],
     ["🔗 Copiază link", "🔗 Copy link", "🔗 लिङ्क प्रतिलिपि गर्नुहोस्"],
