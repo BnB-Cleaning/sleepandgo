@@ -2694,6 +2694,7 @@ body.landing-active { background: var(--h-bg); }
         <button data-t="new" class="${solTab === "new" ? "active" : ""}">➕ Solicitare nouă</button>
         <button data-t="locations" class="${solTab === "locations" ? "active" : ""}">📍 Locațiile mele${pendingLoc ? ` (${pendingLoc} în așteptare)` : ""}</button>
         <button data-t="mine" class="${solTab === "mine" ? "active" : ""}">📋 Solicitările mele</button>
+        <button data-t="linen" class="${solTab === "linen" ? "active" : ""}">🧺 Lenjeria mea</button>
       </div>
       <div id="solBody"></div>
     `));
@@ -2702,6 +2703,7 @@ body.landing-active { background: var(--h-bg); }
     if (seeBtn) seeBtn.onclick = () => { solTab = "mine"; renderSolicitant(u); };
     if (solTab === "new") renderNewRequest(u);
     else if (solTab === "locations") renderMyLocations(u);
+    else if (solTab === "linen") renderMyLinen(u);
     else renderMyRequests(u);
   }
 
@@ -3068,6 +3070,29 @@ body.landing-active { background: var(--h-bg); }
     body.appendChild(wrap);
   }
 
+  /* Inventarul de lenjerie al solicitantului (doar citire) — unde se află seturile lui acum */
+  function renderMyLinen(u) {
+    const body = $("#solBody");
+    const c = S.linenCircuitOf(u.id);
+    const sum = c.atLocation + c.atLaundry + c.atExecutor;
+    body.innerHTML = "";
+    body.appendChild(el(`
+      <div class="section-title" style="margin-top:0">🧺 Lenjeria mea</div>
+      <p class="hint" style="margin:0 0 16px">Unde se află lenjeriile tale acum. Poziția se actualizează automat pe măsură ce se derulează curățeniile: <strong>în locație → la spălătorie → depozitate la Agent Cleaning → înapoi în locație</strong>.</p>
+      <div class="grid cols-4">
+        <div class="card stat"><span class="label">Total seturi introduse</span><span class="value">${c.received}</span></div>
+        <div class="card stat"><span class="label">🏠 În locație</span><span class="value">${c.atLocation}</span></div>
+        <div class="card stat"><span class="label">🧺 La spălătorie</span><span class="value" style="color:var(--warn)">${c.atLaundry}</span></div>
+        <div class="card stat"><span class="label">📦 La Agent Cleaning</span><span class="value brand">${c.atExecutor}</span></div>
+      </div>
+      ${c.received === 0
+        ? `<p class="hint" style="margin-top:14px">Nu ai încă lenjerii în circuit. Administratorul le înregistrează după ce le predai (minim ${C.linenMinSets} seturi).</p>`
+        : sum !== c.received
+          ? `<p class="hint" style="margin-top:14px;color:var(--warn)">⚠️ Distribuția (${sum}) nu se potrivește încă cu totalul (${c.received}). Se corectează automat la următoarea lucrare.</p>`
+          : `<p class="hint" style="margin-top:14px">✓ Toate cele ${c.received} seturi sunt urmărite în circuit.</p>`}
+    `));
+  }
+
   /* =========================================================
      EXECUTANT
      ========================================================= */
@@ -3426,6 +3451,24 @@ body.landing-active { background: var(--h-bg); }
     body.appendChild(el(`<div class="divider"></div>`));
 
     body.appendChild(el(`<p class="hint" style="margin:0 0 16px">Circuitul de lenjerie al fiecărui proprietar. Proprietarul introduce <strong>minim ${C.linenMinSets} seturi</strong>, care rotesc: <strong>în locație → la spălătorie → depozitate la Agent Cleaning → înapoi în locație</strong>. Poziția se actualizează <strong>automat</strong>: la alegerea agentului (📦→🏠), la finalizarea curățeniei (🏠→🧺) și la spălarea gata (🧺→📦). Poți corecta manual oricând.</p>`));
+    // 📊 Statistică totală circuit lenjerie (pe toată platforma)
+    const lt = owners.reduce((s, o) => {
+      const c = S.linenCircuitOf(o.id);
+      s.received += c.received; s.loc += c.atLocation; s.lau += c.atLaundry; s.exe += c.atExecutor;
+      if (c.received > 0) s.withLinen++;
+      if ((c.atLocation + c.atLaundry + c.atExecutor) !== c.received) s.mismatch++;
+      return s;
+    }, { received: 0, loc: 0, lau: 0, exe: 0, withLinen: 0, mismatch: 0 });
+    body.appendChild(el(`
+      <div class="section-title" style="margin-top:0">📊 Stoc lenjerie — total platformă</div>
+      <div class="grid cols-4" style="margin-bottom:10px">
+        <div class="card stat"><span class="label">Total seturi în circuit</span><span class="value">${lt.received}</span></div>
+        <div class="card stat"><span class="label">🏠 În locație</span><span class="value">${lt.loc}</span></div>
+        <div class="card stat"><span class="label">🧺 La spălătorie</span><span class="value" style="color:var(--warn)">${lt.lau}</span></div>
+        <div class="card stat"><span class="label">📦 La Agent Cleaning</span><span class="value brand">${lt.exe}</span></div>
+      </div>
+      <p class="hint" style="margin:0 0 18px">Proprietari cu lenjerie: <strong>${lt.withLinen}</strong> · Nepotriviri: <strong style="color:${lt.mismatch ? "var(--warn)" : "inherit"}">${lt.mismatch}</strong> · Minim per proprietar: <strong>${C.linenMinSets}</strong> seturi</p>
+    `));
     if (!owners.length) { body.appendChild(el(`<p class="hint">Niciun proprietar încă.</p>`)); return; }
     const wrap = el(`<div class="req"></div>`);
     owners.forEach(o => {
@@ -4299,6 +4342,12 @@ body.landing-active { background: var(--h-bg); }
     ["Devino serviciu de lenjerie", "Become a linen service", "बेडसिट सेवा बन्नुहोस्"],
     ["Preiei rute din zona ta după înregistrare.", "Take routes in your area after signing up.", "दर्ता पछि आफ्नो क्षेत्रका रूटहरू लिनुहोस्।"],
     ["🔗 Distribuie", "🔗 Share", "🔗 सेयर गर्नुहोस्"],
+    ["🧺 Lenjeria mea", "🧺 My linen", "🧺 मेरो बेडसिट"],
+    ["Total seturi introduse", "Total sets introduced", "जम्मा सेट राखिएको"],
+    ["🏠 În locație", "🏠 At the location", "🏠 स्थानमा"],
+    ["🧺 La spălătorie", "🧺 At the laundry", "🧺 धुलाइमा"],
+    ["📦 La Agent Cleaning", "📦 At the Cleaning Agent", "📦 Cleaning Agent सँग"],
+    ["Total seturi în circuit", "Total sets in circuit", "चक्रमा जम्मा सेट"],
     ["Link copiat în clipboard!", "Link copied to clipboard!", "लिङ्क क्लिपबोर्डमा प्रतिलिपि भयो!"],
     ["Ora început", "Start time", "सुरु समय"],
     ["Curățenie", "Cleaning", "सफाइ"],
