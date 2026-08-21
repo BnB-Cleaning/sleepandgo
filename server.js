@@ -196,6 +196,34 @@ async function ensureAdmin() {
   }
 }
 
+// Conversie one-off: promovează un solicitant la Agent Cleaning (executant) cu date generice.
+// Setează env PROMOTE_EXECUTANT="email1,email2". Rulează la pornire; idempotent (acționează doar cât e solicitant).
+async function promoteExecutants() {
+  const emails = (process.env.PROMOTE_EXECUTANT || "")
+    .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+  if (!emails.length) return;
+  const st = await getState();
+  let changed = false;
+  for (const email of emails) {
+    const u = (st.users || []).find(x => (x.email || "").toLowerCase() === email);
+    if (!u) { console.log("[promote] utilizator negăsit:", email); continue; }
+    if (u.role === "executant") { console.log("[promote] deja Agent Cleaning:", email); continue; }
+    u.role = "executant";
+    if (!u.business) u.business = {
+      type: "SRL",
+      name: (u.name || "Agent Cleaning") + " SRL",
+      cui: "RO00000000",
+      regCom: "J40/0000/2024",
+      iban: "RO49AAAA1B31007593840000",
+    };
+    if (!u.area) u.area = "București - Sector 3";
+    if (!u.phone) u.phone = "0700000000";
+    changed = true;
+    console.log("[promote] convertit în Agent Cleaning:", email);
+  }
+  if (changed) await saveState(st);
+}
+
 /* ---------------- App ---------------- */
 const app = express();
 
@@ -407,5 +435,6 @@ app.get("*", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
   await getState();      // creează starea inițială dacă lipsește
   await ensureProducts(); // aplică lista de produse (versiune)
   await ensureAdmin();   // creează adminul dacă lipsește
+  await promoteExecutants(); // conversie one-off solicitant → Agent Cleaning (env PROMOTE_EXECUTANT)
   app.listen(PORT, () => console.log("Sleep & Go pe portul " + PORT));
 })();
