@@ -168,7 +168,7 @@ main { max-width: 1080px; margin: 0 auto; padding: 26px 20px 80px; }
 
 /* ---------- Modal ---------- */
 .modal-overlay { position: fixed; inset: 0; background: rgba(6,10,14,.7); backdrop-filter: blur(4px); display: grid; place-items: center; z-index: 50; padding: 20px; }
-.modal { background: var(--card); border: 1px solid var(--line); border-radius: 16px; width: 100%; max-width: 440px; padding: 24px; box-shadow: var(--shadow); }
+.modal { background: var(--card); border: 1px solid var(--line); border-radius: 16px; width: 100%; max-width: 440px; padding: 24px; box-shadow: var(--shadow); max-height: calc(100dvh - 40px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .modal h2 { margin: 0 0 6px; font-size: 20px; }
 .modal .sub { color: var(--muted); margin: 0 0 18px; font-size: 14px; }
 
@@ -387,7 +387,7 @@ a.pill.contact:hover { background: var(--brand); color: #fff; }
 .cal-amt { font-size: 12.5px; font-weight: 800; align-self: flex-start; }
 
 /* ===== Multi-zonă (Serviciu lenjerie) ===== */
-.area-checks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 14px; }
+.area-checks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 14px; max-height: 42vh; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 2px 4px 2px 2px; }
 .area-check { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; padding: 4px 2px; }
 .area-check input { width: 16px; height: 16px; flex: none; }
 @media (max-width: 560px) { .area-checks { grid-template-columns: 1fr; } }
