@@ -169,6 +169,8 @@ main { max-width: 1080px; margin: 0 auto; padding: 26px 20px 80px; }
 /* ---------- Modal ---------- */
 .modal-overlay { position: fixed; inset: 0; background: rgba(6,10,14,.7); backdrop-filter: blur(4px); display: grid; place-items: center; z-index: 50; padding: 20px; }
 .modal { background: var(--card); border: 1px solid var(--line); border-radius: 16px; width: 100%; max-width: 440px; padding: 24px; box-shadow: var(--shadow); max-height: calc(100dvh - 40px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+/* butoanele de acțiune rămân mereu vizibile jos, chiar dacă modalul e lung */
+.modal .btn-row { position: sticky; bottom: -24px; margin: 10px -24px -24px; padding: 14px 24px; background: var(--card); border-top: 1px solid var(--line); z-index: 2; }
 .modal h2 { margin: 0 0 6px; font-size: 20px; }
 .modal .sub { color: var(--muted); margin: 0 0 18px; font-size: 14px; }
 
