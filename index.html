@@ -1106,7 +1106,10 @@ body.landing-active { background: var(--h-bg); }
     // Agentul Cleaning de lenjerie marchează serviciul gata → plata lenjeriei se eliberează
     finishLinenService(reqId) {
       const r = this.requestById(reqId); if (!r) return;
-      r.linenDone = true; r.linenPayoutStatus = "released"; save(db); return r;
+      r.linenDone = true; r.linenPayoutStatus = "released";
+      // circuit lenjerie: curată, depozitată la Agentul Cleaning (🧺 → 📦)
+      this.moveLinenForRequest(r, "atLaundry", "atExecutor");
+      save(db); return r;
     },
 
     // ---- Init: alege modul (server sau localStorage) ----
@@ -1129,6 +1132,12 @@ body.landing-active { background: var(--h-bg); }
     mode() { return MODE; },
     // reîmprospătează starea de pe server (folosit după confirmarea plății)
     async refresh() { if (MODE === "api") { try { await refreshState(); } catch (e) {} } return db; },
+    // salvează IMEDIAT starea pe server și așteaptă (evită cursa înainte de plata Stripe)
+    async flush() {
+      if (MODE !== "api") return;
+      clearTimeout(saveTimer);
+      try { await apiPOST("/api/state", { state: stripState(db) }); pendingSave = false; } catch (e) {}
+    },
 
     // ---- Plată reală (Stripe Checkout, doar în modul API) ----
     // Creează o sesiune de plată pe server și întoarce URL-ul găzduit de Stripe.
@@ -1211,7 +1220,28 @@ body.landing-active { background: var(--h-bg); }
     linenCircuitOf(ownerId) {
       const u = this.userById(ownerId);
       const c = (u && u.linenCircuit) || {};
-      return { received: Number(c.received || 0), atLocation: Number(c.atLocation || 0), atLaundry: Number(c.atLaundry || 0), atExecutor: Number(c.atExecutor || 0) };
+      let received = Number(c.received || 0), atLocation = Number(c.atLocation || 0),
+        atLaundry = Number(c.atLaundry || 0), atExecutor = Number(c.atExecutor || 0);
+      // auto-init: seturi primite dar nedistribuite → toate „în locație" (le pune proprietarul)
+      if (u && received > 0 && (atLocation + atLaundry + atExecutor) === 0) {
+        atLocation = received;
+        u.linenCircuit = { received, atLocation, atLaundry, atExecutor };
+        save(db);
+      }
+      return { received, atLocation, atLaundry, atExecutor };
+    },
+    // mută automat k seturi între stări (k = lenjeriile solicitării), pentru proprietarul locației
+    moveLinenForRequest(req, from, to) {
+      if (!req || !req.linens) return;
+      const loc = this.locationById(req.locationId);
+      const ownerId = loc && loc.ownerId; if (!ownerId) return;
+      const k = Number(req.linenSets) || 0; if (k <= 0) return;
+      const u = this.userById(ownerId); if (!u) return;
+      const c = this.linenCircuitOf(ownerId);   // asigură și inițializarea
+      const move = Math.min(k, c[from]); if (move <= 0) return;
+      c[from] -= move; c[to] += move;
+      u.linenCircuit = { received: c.received, atLocation: c.atLocation, atLaundry: c.atLaundry, atExecutor: c.atExecutor };
+      save(db);
     },
     setLinenCircuit(ownerId, patch) {
       const u = this.userById(ownerId); if (!u) return { ok: false };
@@ -1415,7 +1445,10 @@ body.landing-active { background: var(--h-bg); }
       const r = this.requestById(id);
       if (!r || r.status !== STATUS.PLATIT || r.executorId) return { ok: false };
       if (!r.applicants || !r.applicants.includes(executorId)) return { ok: false, error: "Agentul Cleaning nu mai este disponibil." };
-      r.executorId = executorId; r.status = STATUS.ACCEPTAT; save(db); return { ok: true, r };
+      r.executorId = executorId; r.status = STATUS.ACCEPTAT;
+      // circuit lenjerie: agentul aduce seturile curate din stocul lui în locație (📦 → 🏠)
+      this.moveLinenForRequest(r, "atExecutor", "atLocation");
+      save(db); return { ok: true, r };
     },
     setStatus(id, status) {
       const r = this.requestById(id); if (!r) return;
@@ -1444,6 +1477,8 @@ body.landing-active { background: var(--h-bg); }
       if (!r.workStartedAt) r.workStartedAt = r.workFinishedAt;  // fallback dacă n-a apăsat «Începe lucrul»
       // scade consumabilele folosite din stocul Agentului Cleaning de curățenie
       if (r.executorId && r.consumables && r.consumables.length) this.deductStock(r.executorId, r.consumables);
+      // circuit lenjerie: lenjeria folosită pleacă la spălat (🏠 → 🧺)
+      this.moveLinenForRequest(r, "atLocation", "atLaundry");
       save(db); return r;
     },
     // ---- Pontaj Agent Cleaning (statistici de timp) ----
@@ -2953,6 +2988,7 @@ body.landing-active { background: var(--h-bg); }
     // 1) Încearcă plata REALĂ prin Stripe Checkout (dacă serverul are chei configurate)
     if (S.mode && S.mode() === "api") {
       toast("Se pregătește plata securizată…", "");
+      await S.flush();   // asigură că solicitarea e salvată pe server înainte de a crea sesiunea Stripe
       const res = await S.payCheckout(reqId);
       if (res && res.ok && res.url) { window.location.href = res.url; return; }
       // dacă Stripe nu e configurat pe server → cădem pe simulare; altă eroare → o arătăm
@@ -3389,7 +3425,7 @@ body.landing-active { background: var(--h-bg); }
     }
     body.appendChild(el(`<div class="divider"></div>`));
 
-    body.appendChild(el(`<p class="hint" style="margin:0 0 16px">Circuitul de lenjerie al fiecărui proprietar. Proprietarul introduce <strong>minim ${C.linenMinSets} seturi</strong>, care rotesc: <strong>în locație → la spălătorie → depozitate la Agent Cleaning → înapoi în locație</strong>. „Primite" trebuie să fie egal cu suma celor trei stări.</p>`));
+    body.appendChild(el(`<p class="hint" style="margin:0 0 16px">Circuitul de lenjerie al fiecărui proprietar. Proprietarul introduce <strong>minim ${C.linenMinSets} seturi</strong>, care rotesc: <strong>în locație → la spălătorie → depozitate la Agent Cleaning → înapoi în locație</strong>. Poziția se actualizează <strong>automat</strong>: la alegerea agentului (📦→🏠), la finalizarea curățeniei (🏠→🧺) și la spălarea gata (🧺→📦). Poți corecta manual oricând.</p>`));
     if (!owners.length) { body.appendChild(el(`<p class="hint">Niciun proprietar încă.</p>`)); return; }
     const wrap = el(`<div class="req"></div>`);
     owners.forEach(o => {
