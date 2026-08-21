@@ -1626,6 +1626,22 @@ body.landing-active { background: var(--h-bg); }
   const fmtClock = (ts) => { try { return new Date(ts).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" }); } catch (e) { return "—"; } };
   const fmtDur = (min) => { if (min == null) return "—"; const h = Math.floor(min / 60), m = min % 60; return h ? `${h}h ${m}min` : `${m}min`; };
   const initials = (name) => String(name || "?").trim().split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase();
+
+  // Distribuie pagina: share nativ pe mobil, copiere link pe desktop
+  function shareSite() {
+    const url = (location.origin && location.origin !== "null") ? location.origin + "/" : location.href;
+    const data = { title: "Sleep & Go Cleaning", text: "Curățenie în regim hotelier — Sleep & Go Cleaning", url };
+    if (navigator.share) {
+      navigator.share(data).catch(() => {});
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(() => toast("Link copiat în clipboard!", "ok")).catch(() => toast(url, ""));
+    } else {
+      const t = document.createElement("textarea"); t.value = url; t.style.position = "fixed"; t.style.opacity = "0";
+      document.body.appendChild(t); t.focus(); t.select();
+      try { document.execCommand("copy"); toast("Link copiat în clipboard!", "ok"); } catch (e) { toast(url, ""); }
+      document.body.removeChild(t);
+    }
+  }
   const telHref = (p) => "tel:" + String(p || "").replace(/[^\d+]/g, "");
   const wazeUrl = (addr) => `https://waze.com/ul?q=${encodeURIComponent(addr)}&navigate=yes`;
   const mapsLink = (url) => url ? `<a class="maps-link" href="${esc(url)}" target="_blank" rel="noopener">📍 Deschide în Google Maps</a>` : "";
@@ -1941,6 +1957,7 @@ body.landing-active { background: var(--h-bg); }
             <a data-scroll="servicii">Servicii</a>
             <a data-scroll="inchiriere">Închiriere lenjerii</a>
             <a data-scroll="preturi">Prețuri</a>
+            <button class="h-btn ghost h-share" type="button" data-share>🔗 Distribuie</button>
             <a class="h-btn primary h-cta" data-go="login">Intră în cont</a>
           </nav>
         </div></header>
@@ -2162,6 +2179,7 @@ body.landing-active { background: var(--h-bg); }
       goAuth(t);
     });
     app.querySelectorAll("[data-view]").forEach(a => a.onclick = () => { landingView = a.dataset.view; window.scrollTo(0, 0); renderApp(); });
+    app.querySelectorAll("[data-share]").forEach(b => b.onclick = shareSite);
     app.querySelectorAll("[data-scroll]").forEach(a => a.onclick = () => {
       const target = document.getElementById(a.dataset.scroll);
       if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -2272,6 +2290,7 @@ body.landing-active { background: var(--h-bg); }
             <a data-home>← Acasă</a>
             <a data-scroll="ex-castig">Cât câștigi</a>
             <a data-scroll="ex-cum">Cum începi</a>
+            <button class="h-btn ghost h-share" type="button" data-share>🔗 Distribuie</button>
             <a class="h-btn primary" data-reg="executant">Înscrie-te</a>
           </nav>
         </div></header>
@@ -2386,6 +2405,7 @@ body.landing-active { background: var(--h-bg); }
 
     app.querySelectorAll("[data-home]").forEach(a => a.onclick = () => { landingView = "home"; window.scrollTo(0, 0); renderHome(); });
     app.querySelectorAll("[data-view]").forEach(a => a.onclick = () => { landingView = a.dataset.view; window.scrollTo(0, 0); renderApp(); });
+    app.querySelectorAll("[data-share]").forEach(b => b.onclick = shareSite);
     app.querySelectorAll("[data-reg]").forEach(b => b.onclick = () => { regRole = b.dataset.reg; goAuth("register"); });
     app.querySelectorAll("[data-go]").forEach(b => b.onclick = () => goAuth(b.dataset.go));
     app.querySelectorAll("[data-scroll]").forEach(a => a.onclick = () => {
@@ -2470,6 +2490,7 @@ body.landing-active { background: var(--h-bg); }
             <a data-home>← Acasă</a>
             <a data-scroll="la-castig">Cât câștigi</a>
             <a data-scroll="la-cum">Cum începi</a>
+            <button class="h-btn ghost h-share" type="button" data-share>🔗 Distribuie</button>
             <a class="h-btn primary" data-reg="spalatorie">Înscrie-te</a>
           </nav>
         </div></header>
@@ -2571,6 +2592,7 @@ body.landing-active { background: var(--h-bg); }
 
     app.querySelectorAll("[data-home]").forEach(a => a.onclick = () => { landingView = "home"; window.scrollTo(0, 0); renderHome(); });
     app.querySelectorAll("[data-view]").forEach(a => a.onclick = () => { landingView = a.dataset.view; window.scrollTo(0, 0); renderApp(); });
+    app.querySelectorAll("[data-share]").forEach(b => b.onclick = shareSite);
     app.querySelectorAll("[data-reg]").forEach(b => b.onclick = () => { regRole = b.dataset.reg; goAuth("register"); });
     app.querySelectorAll("[data-go]").forEach(b => b.onclick = () => goAuth(b.dataset.go));
     app.querySelectorAll("[data-scroll]").forEach(a => a.onclick = () => {
@@ -3640,10 +3662,76 @@ body.landing-active { background: var(--h-bg); }
               IBAN: ${esc(usr.business.iban)}
             </div>` : ""}
           ${usr.area ? `<div class="req-notes">📍 ${esc(usr.area)}</div>` : ""}
+          <div style="margin-top:10px;text-align:right">
+            <button class="btn btn-soft" style="padding:6px 14px" data-edit="${usr.id}">✏️ Editează</button>
+          </div>
         </div>
       `));
     });
     body.appendChild(wrap);
+    wrap.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => adminEditUserModal(S.userById(b.dataset.edit)));
+  }
+
+  /* Admin: editează categoria (rolul) + firma/IBAN + zona unui utilizator.
+     Pentru Agent Cleaning / Serviciu lenjerie, datele de firmă și zona sunt OBLIGATORII. */
+  function adminEditUserModal(usr) {
+    if (!usr) return;
+    const roles = [["solicitant", "Solicitant"], ["executant", "Agent Cleaning"], ["spalatorie", "Serviciu lenjerie"], ["admin", "Administrator"]];
+    const b = usr.business || {};
+    modal(`
+      <h2>Editează utilizator</h2>
+      <p class="sub">${esc(usr.name)} · ${esc(usr.email)}</p>
+      <div class="field"><label>Categorie (rol)</label>
+        <select id="euRole">${roles.map(r => `<option value="${r[0]}" ${usr.role === r[0] ? "selected" : ""}>${r[1]}</option>`).join("")}</select>
+      </div>
+      <div id="euBiz">
+        <div class="field"><label>Zona de activitate</label>
+          <select id="euArea">${C.areas.map(a => `<option ${a === usr.area ? "selected" : ""}>${a}</option>`).join("")}</select>
+        </div>
+        <div class="field"><label>Telefon</label><input id="euPhone" value="${esc(usr.phone || "")}" placeholder="07xx xxx xxx"/></div>
+        <div class="field"><label>Formă juridică</label>
+          <select id="euType">${["PFA", "PFI", "SRL"].map(t => `<option ${b.type === t ? "selected" : ""}>${t}</option>`).join("")}</select>
+        </div>
+        <div class="field"><label>Denumire firmă</label><input id="euName" value="${esc(b.name || "")}"/></div>
+        <div class="field"><label>CUI / CIF</label><input id="euCui" value="${esc(b.cui || "")}"/></div>
+        <div class="field"><label>Reg. Comerțului (opțional)</label><input id="euReg" value="${esc(b.regCom || "")}"/></div>
+        <div class="field"><label>IBAN</label><input id="euIban" value="${esc(b.iban || "")}"/></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-soft" onclick="_closeModal()">Renunță</button>
+        <button class="btn" style="flex:1" id="euSave">Salvează</button>
+      </div>
+    `);
+    const roleSel = $("#euRole"), bizWrap = $("#euBiz");
+    const toggleBiz = () => { bizWrap.style.display = ["executant", "spalatorie"].includes(roleSel.value) ? "" : "none"; };
+    roleSel.onchange = toggleBiz; toggleBiz();
+    $("#euSave").onclick = () => {
+      const role = roleSel.value;
+      // protecție: nu lăsa fără niciun admin
+      if (usr.role === "admin" && role !== "admin" && S.users().filter(x => x.role === "admin").length <= 1)
+        return toast("Nu poți schimba singurul administrator.", "err");
+      const patch = { role };
+      if (["executant", "spalatorie"].includes(role)) {
+        const business = {
+          type: $("#euType").value,
+          name: ($("#euName").value || "").trim(),
+          cui: ($("#euCui").value || "").trim(),
+          regCom: ($("#euReg").value || "").trim(),
+          iban: ($("#euIban").value || "").trim(),
+        };
+        const area = $("#euArea").value;
+        const phone = ($("#euPhone").value || "").trim();
+        if (!["PFA", "PFI", "SRL"].includes(business.type)) return toast("Alege forma juridică (PFA/PFI/SRL).", "err");
+        if (!business.name || !business.cui || !business.iban) return toast("Completează firma, CUI/CIF și IBAN.", "err");
+        if (!phone) return toast("Completează telefonul.", "err");
+        if (!area) return toast("Alege zona de activitate.", "err");
+        patch.business = business; patch.area = area; patch.phone = phone;
+      } else {
+        patch.business = null; patch.area = null;
+      }
+      S.updateUser(usr.id, patch);
+      closeModal(); toast("Utilizator actualizat.", "ok"); renderApp();
+    };
   }
 
   /* =========================================================
@@ -4174,6 +4262,8 @@ body.landing-active { background: var(--h-bg); }
     ["Consumabile distribuite (partea ta)", "Consumables distributed (your share)", "वितरण गरिएका उपभोग्य वस्तु (तपाईंको भाग)"],
     ["Devino serviciu de lenjerie", "Become a linen service", "बेडसिट सेवा बन्नुहोस्"],
     ["Preiei rute din zona ta după înregistrare.", "Take routes in your area after signing up.", "दर्ता पछि आफ्नो क्षेत्रका रूटहरू लिनुहोस्।"],
+    ["🔗 Distribuie", "🔗 Share", "🔗 सेयर गर्नुहोस्"],
+    ["Link copiat în clipboard!", "Link copied to clipboard!", "लिङ्क क्लिपबोर्डमा प्रतिलिपि भयो!"],
     ["Ora început", "Start time", "सुरु समय"],
     ["Curățenie", "Cleaning", "सफाइ"],
     ["Comision platformă", "Platform commission", "प्लेटफर्म कमिसन"],
