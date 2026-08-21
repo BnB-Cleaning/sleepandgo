@@ -1250,6 +1250,23 @@ body.landing-active { background: var(--h-bg); }
       const u = db.users.find(x => x.id === id); if (!u) return;
       Object.assign(u, patch); save(db); return u;
     },
+    // ---- Cereri de rol suplimentar (aprobate de admin) ----
+    requestRole(id, role) {
+      const u = db.users.find(x => x.id === id); if (!u) return { ok: false };
+      if (this.rolesOf(u).includes(role)) return { ok: false, error: "Ai deja acest rol." };
+      u.pendingRole = role; u.pendingRoleAt = Date.now(); save(db); return { ok: true };
+    },
+    approveRole(id) {
+      const u = db.users.find(x => x.id === id); if (!u || !u.pendingRole) return { ok: false };
+      const roles = this.rolesOf(u);
+      if (!roles.includes(u.pendingRole)) roles.push(u.pendingRole);
+      u.roles = roles; u.pendingRole = null; u.pendingRoleAt = null; save(db); return { ok: true };
+    },
+    rejectRole(id) {
+      const u = db.users.find(x => x.id === id); if (!u) return { ok: false };
+      u.pendingRole = null; u.pendingRoleAt = null; save(db); return { ok: true };
+    },
+    pendingRoleRequests() { return db.users.filter(u => u.pendingRole); },
 
     // ---- Utilizatori ----
     users() { return db.users.slice(); },
@@ -2044,14 +2061,12 @@ body.landing-active { background: var(--h-bg); }
     sw.onchange = () => { activeRole = sw.value; window.scrollTo(0, 0); renderApp(); };
   }
 
-  // Un prestator (Agent Cleaning / Serviciu lenjerie) își activează singur celălalt rol de prestator
-  // (folosesc aceleași date de firmă + zone deja verificate). Comută apoi panoul din bara de sus.
-  function addRoleSelf(u, role, label) {
-    const roles = S.rolesOf(u);
-    if (roles.includes(role)) return;
-    S.updateUser(u.id, { roles: [...roles, role] });
-    activeRole = role;   // sări direct pe noul panou
-    toast(`Ai activat și rolul de ${label}. Poți comuta panoul din bara de sus.`, "ok");
+  // Un prestator cere adminului activarea celuilalt rol de prestator (Agent Cleaning ↔ Serviciu lenjerie).
+  // Adminul aprobă din panoul de Utilizatori; apoi apare comutatorul de panou.
+  function requestRoleSelf(u, role, label) {
+    const res = S.requestRole(u.id, role);
+    if (!res.ok) return toast(res.error || "Nu s-a putut trimite cererea.", "err");
+    toast(`Cerere trimisă pentru rolul de ${label}. Un administrator o va aproba.`, "ok");
     renderApp();
   }
 
@@ -3329,7 +3344,9 @@ body.landing-active { background: var(--h-bg); }
               ${rating.count ? starsHtml(rating) : `<span class="hint" style="display:inline">fără recenzii încă</span>`}
             </p>
             <p style="margin:4px 0 0">${S.areasOf(u).length > 1 ? "Zonele tale" : "Zona ta"}: <strong style="color:var(--brand)">${S.areasOf(u).map(esc).join(", ") || "—"}</strong> · <span class="link" id="changeArea">schimbă zona</span></p>
-            ${!S.hasRole(u, "spalatorie") ? `<p style="margin:6px 0 0"><span class="link" id="addLaundryRole">➕ Activează și rolul de Serviciu lenjerie</span></p>` : ""}
+            ${S.hasRole(u, "spalatorie") ? "" : (u.pendingRole === "spalatorie"
+              ? `<p style="margin:6px 0 0;color:var(--warn)">⏳ Cerere rol Serviciu lenjerie — în așteptarea aprobării</p>`
+              : `<p style="margin:6px 0 0"><span class="link" id="addLaundryRole">➕ Cere și rolul de Serviciu lenjerie</span></p>`)}
           </div>
         </div>
       </div>
@@ -3349,7 +3366,7 @@ body.landing-active { background: var(--h-bg); }
     `));
     app.querySelectorAll(".navtabs button").forEach(b => b.onclick = () => { execTab = b.dataset.t; renderExecutant(u); });
     $("#changeArea").onclick = () => changeAreaModal(u);
-    if ($("#addLaundryRole")) $("#addLaundryRole").onclick = () => addRoleSelf(u, "spalatorie", "Serviciu lenjerie");
+    if ($("#addLaundryRole")) $("#addLaundryRole").onclick = () => requestRoleSelf(u, "spalatorie", "Serviciu lenjerie");
     $("#avatarBtn").onclick = () => openProfile(u);
     if (execTab === "available") renderAvailable(u, avail);
     else if (execTab === "stock") renderMyStock(u);
@@ -3456,7 +3473,9 @@ body.landing-active { background: var(--h-bg); }
             <h1 style="margin:0">🧺 Serviciu lenjerie</h1>
             <p style="margin:4px 0 0"><span class="pill">${esc(biz.type || "—")} · ${esc(biz.name || u.name)}</span> ${rating.count ? starsHtml(rating) : ""}</p>
             <p style="margin:4px 0 0">Zonele tale: <strong style="color:var(--brand)">${S.areasOf(u).map(esc).join(", ") || "—"}</strong> · <span class="link" id="changeArea">schimbă zonele</span></p>
-            ${!S.hasRole(u, "executant") ? `<p style="margin:6px 0 0"><span class="link" id="addCleanRole">➕ Activează și rolul de Agent Cleaning</span></p>` : ""}
+            ${S.hasRole(u, "executant") ? "" : (u.pendingRole === "executant"
+              ? `<p style="margin:6px 0 0;color:var(--warn)">⏳ Cerere rol Agent Cleaning — în așteptarea aprobării</p>`
+              : `<p style="margin:6px 0 0"><span class="link" id="addCleanRole">➕ Cere și rolul de Agent Cleaning</span></p>`)}
           </div>
         </div>
       </div>
@@ -3474,7 +3493,7 @@ body.landing-active { background: var(--h-bg); }
     `));
     app.querySelectorAll(".navtabs button").forEach(b => b.onclick = () => { laundryTab = b.dataset.t; renderSpalatorie(u); });
     $("#changeArea").onclick = () => changeAreaModal(u);
-    if ($("#addCleanRole")) $("#addCleanRole").onclick = () => addRoleSelf(u, "executant", "Agent Cleaning");
+    if ($("#addCleanRole")) $("#addCleanRole").onclick = () => requestRoleSelf(u, "executant", "Agent Cleaning");
     $("#avatarBtn").onclick = () => openProfile(u);
     const body = $("#laundryBody");
     if (laundryTab === "earnings") { renderEarningsCalendar(u, body, () => renderSpalatorie(u)); return; }
@@ -3620,6 +3639,7 @@ body.landing-active { background: var(--h-bg); }
     app.innerHTML = "";
     const pendingLoc = S.pendingLocations().length;
     const stockAlerts = S.stockAlerts().length;
+    const roleReqCount = S.pendingRoleRequests().length;
     app.appendChild(el(`
       <div class="page-head">
         <h1>Panou administrare</h1>
@@ -3634,7 +3654,7 @@ body.landing-active { background: var(--h-bg); }
         <button data-t="linen" class="${adminTab === "linen" ? "active" : ""}">🛏️ Lenjerie</button>
         <button data-t="requests" class="${adminTab === "requests" ? "active" : ""}">🧾 Solicitări</button>
         <button data-t="time" class="${adminTab === "time" ? "active" : ""}">⏱️ Pontaj</button>
-        <button data-t="users" class="${adminTab === "users" ? "active" : ""}">👥 Utilizatori</button>
+        <button data-t="users" class="${adminTab === "users" ? "active" : ""}">👥 Utilizatori${roleReqCount ? ` <span class="tab-alert">${roleReqCount}</span>` : ""}</button>
       </div>
       <div id="admBody"></div>
     `));
@@ -4051,6 +4071,36 @@ body.landing-active { background: var(--h-bg); }
   function renderAdminUsers() {
     const body = $("#admBody");
     body.innerHTML = "";
+    // Cereri de rol suplimentar în așteptare (aprobare admin)
+    const roleReqs = S.pendingRoleRequests();
+    if (roleReqs.length) {
+      body.appendChild(el(`<div class="section-title" style="margin-top:0">⏳ Cereri de rol în așteptare (${roleReqs.length})</div>`));
+      const rw = el(`<div class="req" style="margin-bottom:22px"></div>`);
+      roleReqs.forEach(usr => {
+        const item = el(`
+          <div class="req-item">
+            <div class="req-top">
+              <div style="display:flex;align-items:center;gap:12px">${avatarHtml(usr, 40)}
+                <div><h3 style="margin:0">${esc(usr.name)}</h3>
+                  <div class="req-meta"><span>✉️ ${esc(usr.email)}</span><span>are: ${S.rolesOf(usr).map(r => roleLabel[r]).join(", ")}</span></div>
+                </div>
+              </div>
+              <span class="badge nou">cere: ${roleLabel[usr.pendingRole] || esc(usr.pendingRole)}</span>
+            </div>
+            <div class="req-body">
+              <span class="hint">${usr.pendingRoleAt ? "Trimisă: " + fmtWhen(usr.pendingRoleAt) : ""}</span>
+              <div class="btn-row">
+                <button class="btn btn-soft btn-sm" data-rrej="${usr.id}">Respinge</button>
+                <button class="btn btn-ok btn-sm" data-rapp="${usr.id}">✓ Aprobă</button>
+              </div>
+            </div>
+          </div>`);
+        rw.appendChild(item);
+      });
+      body.appendChild(rw);
+      rw.querySelectorAll("[data-rapp]").forEach(b => b.onclick = () => { S.approveRole(b.dataset.rapp); toast("Rol aprobat.", "ok"); renderAdmin(S.currentUser()); });
+      rw.querySelectorAll("[data-rrej]").forEach(b => b.onclick = () => { S.rejectRole(b.dataset.rrej); toast("Cerere respinsă.", ""); renderAdmin(S.currentUser()); });
+    }
     const cardHtml = (usr) => {
       const rt = usr.role === "executant" ? S.ratingOf(usr.id) : null;
       const areas = S.areasOf(usr);
@@ -4715,8 +4765,10 @@ body.landing-active { background: var(--h-bg); }
     ["🏠 Solicitanți", "🏠 Clients", "🏠 ग्राहकहरू"],
     ["🧹 Agenți Cleaning", "🧹 Cleaning Agents", "🧹 Cleaning Agent हरू"],
     ["🧺 Serviciu lenjerie", "🧺 Linen service", "🧺 बेडसिट सेवा"],
-    ["➕ Activează și rolul de Serviciu lenjerie", "➕ Also enable the Linen service role", "➕ बेडसिट सेवा भूमिका पनि सक्रिय गर्नुहोस्"],
-    ["➕ Activează și rolul de Agent Cleaning", "➕ Also enable the Cleaning Agent role", "➕ Cleaning Agent भूमिका पनि सक्रिय गर्नुहोस्"],
+    ["➕ Cere și rolul de Serviciu lenjerie", "➕ Request the Linen service role too", "➕ बेडसिट सेवा भूमिका पनि अनुरोध गर्नुहोस्"],
+    ["➕ Cere și rolul de Agent Cleaning", "➕ Request the Cleaning Agent role too", "➕ Cleaning Agent भूमिका पनि अनुरोध गर्नुहोस्"],
+    ["⏳ Cerere rol Serviciu lenjerie — în așteptarea aprobării", "⏳ Linen service role request — awaiting approval", "⏳ बेडसिट सेवा भूमिका अनुरोध — स्वीकृतिको प्रतीक्षामा"],
+    ["⏳ Cerere rol Agent Cleaning — în așteptarea aprobării", "⏳ Cleaning Agent role request — awaiting approval", "⏳ Cleaning Agent भूमिका अनुरोध — स्वीकृतिको प्रतीक्षामा"],
     ["Distribuie", "Share", "सेयर गर्नुहोस्"],
     ["Trimite linkul prietenilor sau partenerilor.", "Send the link to friends or partners.", "साथी वा साझेदारलाई लिङ्क पठाउनुहोस्।"],
     ["🔗 Copiază link", "🔗 Copy link", "🔗 लिङ्क प्रतिलिपि गर्नुहोस्"],
