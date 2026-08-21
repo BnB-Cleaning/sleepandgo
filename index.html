@@ -1247,7 +1247,7 @@ body.landing-active { background: var(--h-bg); }
     // zonele în care activează un utilizator (Serviciul de lenjerie poate avea mai multe)
     areasOf(u) { const x = u && u.areas; return (Array.isArray(x) && x.length) ? x : (u && u.area ? [u.area] : []); },
     // există cel puțin un Agent Cleaning (curățenie) activ în zonă?
-    hasActiveExecutorInArea(area) { return db.users.some(u => u.role === "executant" && u.area === area); },
+    hasActiveExecutorInArea(area) { return db.users.some(u => u.role === "executant" && this.areasOf(u).includes(area)); },
     setAvatar(id, dataUrl) {
       const u = db.users.find(x => x.id === id); if (!u) return;
       u.avatar = dataUrl; save(db); return u;
@@ -1462,7 +1462,7 @@ body.landing-active { background: var(--h-bg); }
     applyToRequest(id, executorId) {
       const r = this.requestById(id);
       if (!r || r.status !== STATUS.PLATIT || r.executorId) return { ok: false };
-      if (r.area !== (this.userById(executorId) || {}).area) return { ok: false };
+      if (!this.areasOf(this.userById(executorId)).includes(r.area)) return { ok: false };
       if (!r.applicants) r.applicants = [];
       if (!r.applicants.includes(executorId)) r.applicants.push(executorId);
       save(db); return { ok: true, r };
@@ -1554,8 +1554,9 @@ body.landing-active { background: var(--h-bg); }
 
     // curățenii disponibile: plătite, fără Agent Cleaning de curățenie, în zona lui
     availableForExecutor(executor) {
+      const areas = this.areasOf(executor);
       return this.requests().filter(r =>
-        r.status === STATUS.PLATIT && !r.executorId && r.area === executor.area);
+        r.status === STATUS.PLATIT && !r.executorId && areas.includes(r.area));
     },
     // solicitări de curățenie la care se pot înscrie Agenții Cleaning din zonă (nu sunt deja atribuite mie)
     openForExecutor(executor) {
@@ -1931,12 +1932,9 @@ body.landing-active { background: var(--h-bg); }
           </div>
           <div class="hint" style="margin:-6px 0 4px">Telefonul e vizibil doar între Agent Cleaning și serviciul de lenjerie, pentru coordonarea ridicării.</div>
           <div class="field">
-            <label>${regRole === "spalatorie" ? "Zonele în care activez" : "Zona în care activez"}</label>
-            ${regRole === "spalatorie"
-              ? `<div class="area-checks">${C.areas.map(a => `<label class="area-check"><input type="checkbox" name="areaMulti" value="${esc(a)}"/> <span>${a}</span></label>`).join("")}</div>
-                 <div class="hint">Bifează mai multe zone — preiei lenjerie din toate.</div>`
-              : `<select name="area">${C.areas.map(a => `<option>${a}</option>`).join("")}</select>
-                 <div class="hint">Vei vedea doar solicitările din această zonă.</div>`}
+            <label>${regRole === "executant" ? `Zonele în care activez (max ${maxAreasFor("executant")})` : "Zonele în care activez"}</label>
+            <div class="area-checks">${C.areas.map(a => `<label class="area-check"><input type="checkbox" name="areaMulti" value="${esc(a)}"/> <span>${a}</span></label>`).join("")}</div>
+            <div class="hint">${regRole === "executant" ? `Bifează cel mult ${maxAreasFor("executant")} zone.` : "Bifează mai multe zone — preiei lenjerie din toate."}</div>
           </div>
         </div>
         <button class="btn btn-block" type="submit">Creează cont</button>
@@ -1949,6 +1947,8 @@ body.landing-active { background: var(--h-bg); }
       regBiz = o.dataset.biz;
       body.querySelectorAll(".role-opt[data-biz]").forEach(x => x.classList.toggle("active", x.dataset.biz === regBiz));
     });
+    // Agent Cleaning: limitează bifarea la 2 zone
+    if (regRole === "executant") wireAreaMax(2);
     $("#regForm").onsubmit = async (e) => {
       e.preventDefault();
       const f = new FormData(e.target);
@@ -1956,12 +1956,14 @@ body.landing-active { background: var(--h-bg); }
         name: f.get("name"), email: f.get("email"), password: f.get("password"),
         role: regRole,
       };
-      // Serviciul de lenjerie poate alege MAI MULTE zone; celelalte roluri — una singură
-      let laundryAreas = null;
-      if (regRole === "spalatorie") {
-        laundryAreas = [...e.target.querySelectorAll('input[name="areaMulti"]:checked')].map(i => i.value);
-        if (!laundryAreas.length) return toast("Alege cel puțin o zonă.", "err");
-        payload.area = laundryAreas[0];
+      // Agent Cleaning: max 2 zone; Serviciu lenjerie: nelimitat; alte roluri: o zonă
+      let multiAreas = null;
+      if (regRole === "executant" || regRole === "spalatorie") {
+        multiAreas = [...e.target.querySelectorAll('input[name="areaMulti"]:checked')].map(i => i.value);
+        if (!multiAreas.length) return toast("Alege cel puțin o zonă.", "err");
+        const maxZ = maxAreasFor(regRole);
+        if (multiAreas.length > maxZ) return toast(`Maxim ${maxZ} zone.`, "err");
+        payload.area = multiAreas[0];
       } else {
         payload.area = f.get("area");
       }
@@ -1975,8 +1977,8 @@ body.landing-active { background: var(--h-bg); }
       }
       const res = await S.register(payload);
       if (!res.ok) return toast(res.error, "err");
-      // persistă lista de zone pentru Serviciul de lenjerie
-      if (laundryAreas && res.user) { S.updateUser(res.user.id, { areas: laundryAreas, area: laundryAreas[0] }); await S.flush(); }
+      // persistă lista de zone (Agent Cleaning / Serviciu lenjerie)
+      if (multiAreas && res.user) { S.updateUser(res.user.id, { areas: multiAreas, area: multiAreas[0] }); await S.flush(); }
       toast("Cont creat cu succes!", "ok");
       renderApp();
     };
@@ -3269,7 +3271,7 @@ body.landing-active { background: var(--h-bg); }
               <span class="pill">${esc(biz.type || "—")} · ${esc(biz.name || u.name)}</span>
               ${rating.count ? starsHtml(rating) : `<span class="hint" style="display:inline">fără recenzii încă</span>`}
             </p>
-            <p style="margin:4px 0 0">Zona ta: <strong style="color:var(--brand)">${esc(u.area)}</strong> · <span class="link" id="changeArea">schimbă zona</span></p>
+            <p style="margin:4px 0 0">${S.areasOf(u).length > 1 ? "Zonele tale" : "Zona ta"}: <strong style="color:var(--brand)">${S.areasOf(u).map(esc).join(", ") || "—"}</strong> · <span class="link" id="changeArea">schimbă zona</span></p>
           </div>
         </div>
       </div>
@@ -3515,37 +3517,37 @@ body.landing-active { background: var(--h-bg); }
     };
   }
 
+  // grilă de checkbox-uri cu zone (bifate cele curente)
+  function areaChecksHtml(current) {
+    return C.areas.map(a => `<label class="area-check"><input type="checkbox" value="${esc(a)}" ${(current || []).includes(a) ? "checked" : ""}/> <span>${a}</span></label>`).join("");
+  }
+  // limitează numărul de zone bifate (ex. agenții: max 2) — dezactivează restul când s-a atins maximul
+  function wireAreaMax(max) {
+    if (!max || max >= 99) return;
+    const boxes = [...document.querySelectorAll(".area-check input")];
+    const apply = () => { const n = boxes.filter(b => b.checked).length; boxes.forEach(b => { if (!b.checked) b.disabled = n >= max; }); };
+    boxes.forEach(b => b.addEventListener("change", apply)); apply();
+  }
+  // numărul maxim de zone per rol: Agent Cleaning 4, Serviciu lenjerie nelimitat
+  const maxAreasFor = (role) => role === "executant" ? 4 : (role === "spalatorie" ? 99 : 1);
+
   function changeAreaModal(u) {
-    // Serviciul de lenjerie poate activa în MAI MULTE zone simultan → checkbox-uri
-    if (u.role === "spalatorie") {
-      const current = S.areasOf(u);
-      modal(`
-        <h2>Zonele tale de activitate</h2>
-        <p class="sub">Poți prelua lenjerie din mai multe zone simultan. Bifează zonele dorite.</p>
-        <div class="field"><div class="area-checks">
-          ${C.areas.map(a => `<label class="area-check"><input type="checkbox" value="${esc(a)}" ${current.includes(a) ? "checked" : ""}/> <span>${a}</span></label>`).join("")}
-        </div></div>
-        <div class="btn-row"><button class="btn btn-soft" onclick="_closeModal()">Renunță</button>
-        <button class="btn" style="flex:1" id="saveArea">Salvează</button></div>
-      `);
-      $("#saveArea").onclick = () => {
-        const areas = [...document.querySelectorAll(".area-check input:checked")].map(i => i.value);
-        if (!areas.length) return toast("Alege cel puțin o zonă.", "err");
-        S.updateUser(u.id, { areas, area: areas[0] });
-        closeModal(); toast("Zone actualizate.", "ok"); renderApp();
-      };
-      return;
-    }
+    const max = maxAreasFor(u.role);
+    const current = S.areasOf(u);
     modal(`
-      <h2>Schimbă zona de activitate</h2>
-      <p class="sub">Vei vedea solicitările din zona selectată.</p>
-      <div class="field"><select id="newArea">${C.areas.map(a => `<option ${a === u.area ? "selected" : ""}>${a}</option>`).join("")}</select></div>
+      <h2>${u.role === "executant" ? `Zonele tale (max ${max})` : "Zonele tale de activitate"}</h2>
+      <p class="sub">${u.role === "executant" ? `Poți activa în cel mult ${max} zone.` : "Poți prelua lenjerie din mai multe zone simultan."} Bifează zonele dorite.</p>
+      <div class="field"><div class="area-checks">${areaChecksHtml(current)}</div></div>
       <div class="btn-row"><button class="btn btn-soft" onclick="_closeModal()">Renunță</button>
       <button class="btn" style="flex:1" id="saveArea">Salvează</button></div>
     `);
+    wireAreaMax(max);
     $("#saveArea").onclick = () => {
-      S.updateUser(u.id, { area: $("#newArea").value, areas: [$("#newArea").value] });
-      closeModal(); toast("Zonă actualizată.", "ok"); renderApp();
+      const areas = [...document.querySelectorAll(".area-check input:checked")].map(i => i.value);
+      if (!areas.length) return toast("Alege cel puțin o zonă.", "err");
+      if (areas.length > max) return toast(`Maxim ${max} zone.`, "err");
+      S.updateUser(u.id, { areas, area: areas[0] });
+      closeModal(); toast("Zone actualizate.", "ok"); renderApp();
     };
   }
 
@@ -4033,8 +4035,8 @@ body.landing-active { background: var(--h-bg); }
         <select id="euRole">${roles.map(r => `<option value="${r[0]}" ${usr.role === r[0] ? "selected" : ""}>${r[1]}</option>`).join("")}</select>
       </div>
       <div id="euBiz">
-        <div class="field"><label>Zona de activitate</label>
-          <select id="euArea">${C.areas.map(a => `<option ${a === usr.area ? "selected" : ""}>${a}</option>`).join("")}</select>
+        <div class="field"><label>Zone de activitate <span id="euAreaHint" style="color:var(--muted,#8aa);font-weight:400"></span></label>
+          <div class="area-checks" id="euAreas">${areaChecksHtml(S.areasOf(usr))}</div>
         </div>
         <div class="field"><label>Telefon</label><input id="euPhone" value="${esc(usr.phone || "")}" placeholder="07xx xxx xxx"/></div>
         <div class="field"><label>Formă juridică</label>
@@ -4051,7 +4053,17 @@ body.landing-active { background: var(--h-bg); }
       </div>
     `);
     const roleSel = $("#euRole"), bizWrap = $("#euBiz");
-    const toggleBiz = () => { bizWrap.style.display = ["executant", "spalatorie"].includes(roleSel.value) ? "" : "none"; };
+    // aplică limita de zone după rol (agent max 2, lenjerie nelimitat)
+    const applyAreaLimit = () => {
+      const max = maxAreasFor(roleSel.value);
+      const boxes = [...document.querySelectorAll("#euAreas input")];
+      if (max < 99) { const checked = boxes.filter(b => b.checked); if (checked.length > max) checked.slice(max).forEach(b => (b.checked = false)); }
+      const n = boxes.filter(b => b.checked).length;
+      boxes.forEach(b => { if (!b.checked) b.disabled = max < 99 && n >= max; });
+      const hint = $("#euAreaHint"); if (hint) hint.textContent = roleSel.value === "executant" ? `(max ${maxAreasFor("executant")})` : (roleSel.value === "spalatorie" ? "(mai multe)" : "");
+    };
+    document.querySelectorAll("#euAreas input").forEach(b => b.addEventListener("change", applyAreaLimit));
+    const toggleBiz = () => { bizWrap.style.display = ["executant", "spalatorie"].includes(roleSel.value) ? "" : "none"; applyAreaLimit(); };
     roleSel.onchange = toggleBiz; toggleBiz();
     $("#euSave").onclick = () => {
       const role = roleSel.value;
@@ -4067,15 +4079,17 @@ body.landing-active { background: var(--h-bg); }
           regCom: ($("#euReg").value || "").trim(),
           iban: ($("#euIban").value || "").trim(),
         };
-        const area = $("#euArea").value;
+        const areas = [...document.querySelectorAll("#euAreas input:checked")].map(i => i.value);
         const phone = ($("#euPhone").value || "").trim();
+        const max = maxAreasFor(role);
         if (!["PFA", "PFI", "SRL"].includes(business.type)) return toast("Alege forma juridică (PFA/PFI/SRL).", "err");
         if (!business.name || !business.cui || !business.iban) return toast("Completează firma, CUI/CIF și IBAN.", "err");
         if (!phone) return toast("Completează telefonul.", "err");
-        if (!area) return toast("Alege zona de activitate.", "err");
-        patch.business = business; patch.area = area; patch.phone = phone;
+        if (!areas.length) return toast("Alege cel puțin o zonă.", "err");
+        if (areas.length > max) return toast(`Maxim ${max} zone pentru acest rol.`, "err");
+        patch.business = business; patch.areas = areas; patch.area = areas[0]; patch.phone = phone;
       } else {
-        patch.business = null; patch.area = null;
+        patch.business = null; patch.area = null; patch.areas = null;
       }
       S.updateUser(usr.id, patch);
       closeModal(); toast("Utilizator actualizat.", "ok"); renderApp();
@@ -4641,6 +4655,10 @@ body.landing-active { background: var(--h-bg); }
     ["Poți prelua lenjerie din mai multe zone simultan. Bifează zonele dorite.", "You can take linen from several areas at once. Tick the areas you want.", "तपाईं एकैपटक धेरै क्षेत्रबाट बेडसिट लिन सक्नुहुन्छ। इच्छित क्षेत्रहरू छान्नुहोस्।"],
     ["schimbă zonele", "change areas", "क्षेत्रहरू परिवर्तन गर्नुहोस्"],
     ["Zonele în care activez", "The areas I operate in", "म काम गर्ने क्षेत्रहरू"],
+    ["Zonele în care activez (max 4)", "The areas I operate in (max 4)", "म काम गर्ने क्षेत्रहरू (बढीमा ४)"],
+    ["Bifează cel mult 4 zone.", "Tick at most 4 areas.", "बढीमा ४ क्षेत्र छान्नुहोस्।"],
+    ["Zonele tale (max 4)", "Your areas (max 4)", "तपाईंका क्षेत्रहरू (बढीमा ४)"],
+    ["Poți activa în cel mult 4 zone.", "You can operate in at most 4 areas.", "तपाईं बढीमा ४ क्षेत्रमा काम गर्न सक्नुहुन्छ।"],
     ["Bifează mai multe zone — preiei lenjerie din toate.", "Tick several areas — you take linen from all of them.", "धेरै क्षेत्र छान्नुहोस् — सबैबाट बेडसिट लिनुहुन्छ।"],
     ["Zone actualizate.", "Areas updated.", "क्षेत्रहरू अद्यावधिक भयो।"],
     ["Alege cel puțin o zonă.", "Choose at least one area.", "कम्तीमा एक क्षेत्र छान्नुहोस्।"],
