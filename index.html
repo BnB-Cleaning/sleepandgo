@@ -410,6 +410,24 @@ a.pill.contact:hover { background: var(--brand); color: #fff; }
 .role-switch { background: var(--card); color: var(--ink, #e5e7eb); border: 1px solid var(--brand, #22d3ee); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 700; cursor: pointer; margin-right: 10px; }
 .role-switch:focus { outline: none; box-shadow: 0 0 0 3px rgba(34,211,238,.25); }
 
+/* ===== Contract (document generat) ===== */
+.contract { background: #ffffff; color: #1a1a1a; padding: 26px 28px; border-radius: 10px; font-size: 13.5px; line-height: 1.6; margin-bottom: 4px; }
+.contract h1 { font-size: 18px; text-align: center; margin: 0 0 4px; color: #111; letter-spacing: .5px; }
+.contract .cnr { text-align: center; color: #666; font-size: 12px; margin-bottom: 18px; }
+.contract h3 { font-size: 14px; margin: 16px 0 6px; color: #111; }
+.contract p, .contract li { color: #333; margin: 6px 0; }
+.contract ul { margin: 6px 0; padding-left: 20px; }
+.contract .sign { display: flex; justify-content: space-between; gap: 24px; margin-top: 34px; }
+.contract .sign > div { flex: 1; }
+.contract .sign .line { margin-top: 46px; border-top: 1px solid #888; padding-top: 5px; font-size: 12px; color: #555; text-align: center; }
+@media print {
+  body * { visibility: hidden !important; }
+  #contractDoc, #contractDoc * { visibility: visible !important; }
+  #contractDoc { position: absolute; left: 0; top: 0; width: 100%; margin: 0; box-shadow: none; border-radius: 0; }
+  .modal-overlay { position: static !important; background: none !important; backdrop-filter: none !important; padding: 0 !important; }
+  .modal { max-height: none !important; overflow: visible !important; box-shadow: none !important; border: none !important; padding: 0 !important; max-width: 100% !important; }
+}
+
 /* =========================================================
    Sleep & Go Cleaning — HOME / LANDING
    Brand preluat de pe sleepandgocleaning.com:
@@ -750,7 +768,7 @@ body.landing-active { background: var(--h-bg); }
     // limită de dimensiune pentru documentul de suprafață (demo, salvat în localStorage)
     maxDocBytes: 2 * 1024 * 1024,
     // limită pentru poza de profil
-    maxAvatarBytes: 1 * 1024 * 1024,
+    maxAvatarBytes: 15 * 1024 * 1024,   // fișier brut acceptat (poze de pe telefon); e redimensionat la salvare
     // Zonele/orașele deservite — folosite la potrivirea Agent Cleaning ↔ solicitare
     areas: [
       "București - Centrul Vechi",
@@ -2040,12 +2058,19 @@ body.landing-active { background: var(--h-bg); }
     av.innerHTML = avatarHtml(u, 34);
     av.style.cursor = "pointer";
     av.onclick = () => openProfile(u);
+    // buton „Contract" — contractul generat automat din datele contului
+    let cbtn = $("#contractBtn");
+    if (!cbtn) { cbtn = el(`<button id="contractBtn" class="btn btn-soft btn-sm" title="Contractul meu">📄 Contract</button>`); $(".topbar-right").insertBefore(cbtn, $("#logoutBtn")); }
+    cbtn.onclick = () => openContract(u);
     $("#logoutBtn").onclick = async () => { await S.logout(); activeRole = null; toast("Te-ai deconectat.", ""); landing = true; renderHome(); };
 
-    if (activeRole === "admin") return renderAdmin(u);
-    if (activeRole === "executant") return renderExecutant(u);
-    if (activeRole === "spalatorie") return renderSpalatorie(u);
-    return renderSolicitant(u);
+    if (activeRole === "admin") renderAdmin(u);
+    else if (activeRole === "executant") renderExecutant(u);
+    else if (activeRole === "spalatorie") renderSpalatorie(u);
+    else renderSolicitant(u);
+
+    // poză de profil OBLIGATORIE pentru toți userii (nu redeschide dacă modalul e deja afișat)
+    if (!u.avatar && !$("#raSave")) requireAvatar(u);
   }
 
   /* Comutator de panou pentru utilizatorii cu roluri multiple (ex. Solicitant + Serviciu lenjerie) */
@@ -2070,6 +2095,90 @@ body.landing-active { background: var(--h-bg); }
     renderApp();
   }
 
+  // citește o poză și o REDIMENSIONEAZĂ pe client (max ~600px, JPEG) → dataUrl mic,
+  // ca să meargă și pozele mari de pe telefon fără a îngreuna baza de date.
+  function readAvatarFile(file, cb) {
+    if (!file) return;
+    if (file.size > C.maxAvatarBytes) return toast("Poza e prea mare (max " + Math.round(C.maxAvatarBytes / 1024 / 1024) + " MB).", "err");
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 600;
+        let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+        const scale = Math.min(1, MAX / Math.max(w, h));
+        w = Math.max(1, Math.round(w * scale)); h = Math.max(1, Math.round(h * scale));
+        try {
+          const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+          cv.getContext("2d").drawImage(img, 0, 0, w, h);
+          cb(cv.toDataURL("image/jpeg", 0.82));
+        } catch (e) { cb(reader.result); }
+      };
+      img.onerror = () => cb(reader.result);
+      img.src = reader.result;
+    };
+    reader.onerror = () => toast("Nu s-a putut citi poza.", "err");
+    reader.readAsDataURL(file);
+  }
+
+  /* ---------- Contract (generat automat din datele contului) ---------- */
+  function contractNo(u) {
+    const y = new Date().getFullYear();
+    const sfx = String(u.id || "").replace(/[^a-z0-9]/gi, "").slice(-5).toUpperCase() || "00000";
+    return `SG-${y}-${sfx}`;
+  }
+  function contractHtml(u) {
+    const roles = S.rolesOf(u);
+    const b = u.business || {};
+    const isProvider = roles.includes("executant") || roles.includes("spalatorie");
+    const dateStr = new Date(u.contractAt || Date.now()).toLocaleDateString("ro-RO");
+    const areas = S.areasOf(u);
+    const party = isProvider
+      ? `<strong>${esc(b.name || u.name)}</strong> (${esc(b.type || "—")}), CUI/CIF: ${esc(b.cui || "—")}${b.regCom ? ", Reg. Com.: " + esc(b.regCom) : ""}, IBAN: ${esc(b.iban || "—")}, reprezentat prin ${esc(u.name)}, email ${esc(u.email)}${u.phone ? ", tel. " + esc(u.phone) : ""}, denumit în continuare «Prestatorul».`
+      : `<strong>${esc(u.name)}</strong>, email ${esc(u.email)}${u.phone ? ", tel. " + esc(u.phone) : ""}, denumit în continuare «Beneficiarul».`;
+    const objParts = [];
+    if (roles.includes("solicitant")) objParts.push("comandarea și plata în avans a serviciilor de curățenie în regim hotelier pentru locațiile proprii, prin intermediul Platformei");
+    if (roles.includes("executant")) objParts.push("prestarea serviciilor de curățenie în regim hotelier în zonele de activitate alese, către clienții Platformei");
+    if (roles.includes("spalatorie")) objParts.push("preluarea, spălarea, călcarea și returnarea lenjeriei, precum și distribuția consumabilelor către Agenții Cleaning");
+    let guar = "";
+    if (roles.includes("executant")) guar += `<li><strong>Agent Cleaning:</strong> depune un <strong>CEC cu plată la termen (cec de garanție)</strong>, ca garanție pentru respectarea spațiilor de lucru, a programărilor și a integrității lenjeriei și consumabilelor aflate în grija sa. Cecul se poate executa în cazul nerespectării obligațiilor sau al producerii de prejudicii.</li>`;
+    if (roles.includes("spalatorie")) guar += `<li><strong>Serviciu lenjerie:</strong> depune un <strong>CEC de garanție de ${C.linenSetPriceRon} lei / set de lenjerie</strong>, care se execută în cazul pierderii sau deteriorării lenjeriilor aflate în custodie.</li>`;
+    if (roles.includes("solicitant")) guar += `<li><strong>Garanția Platformei către Beneficiar:</strong> dacă lucrarea nu este efectuată în intervalul orar rezervat, Beneficiarul primește <strong>rambursare integrală + ${C.guaranteeBonusRon} lei</strong>.</li>`;
+    return `<div id="contractDoc" class="contract">
+      <h1>CONTRACT DE ${isProvider ? "COLABORARE" : "PRESTĂRI SERVICII"}</h1>
+      <div class="cnr">Nr. ${contractNo(u)} · din ${dateStr}</div>
+      <p><strong>Părțile:</strong></p>
+      <p>1. Platforma <strong>«Sleep &amp; Go Cleaning»</strong>, administrată și facturată de <strong>S.C. GlobalApps S.R.L.</strong> (CUI 35751892, Reg. Com. J40/3223/2016), denumită în continuare «Platforma»; și</p>
+      <p>2. ${party}</p>
+      <h3>1. Obiectul contractului</h3>
+      <p>Prezentul contract are ca obiect ${objParts.join("; ")}.${isProvider && areas.length ? ` Zone de activitate: <strong>${areas.map(esc).join(", ")}</strong>.` : ""}</p>
+      <h3>2. Garanții</h3><ul>${guar}</ul>
+      <h3>3. Plăți și comision</h3>
+      <p>${roles.includes("solicitant") ? "Beneficiarul plătește în avans, prin Platformă, prețul afișat la momentul comenzii. " : ""}${isProvider ? `Prestatorul încasează contravaloarea serviciilor prestate, după finalizare, din care Platforma reține un comision de <strong>${S.commissionPct()}%</strong>. ` : ""}Plățile se procesează securizat prin Platformă.</p>
+      <h3>4. Obligații generale</h3>
+      <ul>
+        <li>Respectarea programului (8:00–19:00), a intervalelor rezervate și a standardelor de calitate.</li>
+        <li>Confidențialitatea datelor de acces la locații (cod interfon, lockbox / yală).</li>
+        ${isProvider ? "<li>Menținerea statutului de entitate juridică (PFA/PFI/SRL) valabilă pe durata colaborării.</li>" : ""}
+        <li>Comunicarea prin Platformă și soluționarea cu bună-credință a eventualelor neconformități.</li>
+      </ul>
+      <h3>5. Durata și încetarea</h3>
+      <p>Contractul se încheie pe durată nedeterminată și produce efecte de la data aprobării contului. Poate înceta prin acordul părților sau prin renunțare, cu restituirea garanțiilor rămase necuvenite după stingerea obligațiilor.</p>
+      <div class="sign">
+        <div><div class="line">S.C. GlobalApps S.R.L.<br><small>Platforma «Sleep &amp; Go Cleaning»</small></div></div>
+        <div><div class="line">${esc(isProvider ? (b.name || u.name) : u.name)}</div></div>
+      </div>
+    </div>`;
+  }
+  function openContract(u) {
+    if (!u.contractAt) S.updateUser(u.id, { contractAt: Date.now() });
+    modal(`${contractHtml(u)}
+      <div class="btn-row">
+        <button class="btn btn-soft" onclick="_closeModal()">Închide</button>
+        <button class="btn" style="flex:1" onclick="window.print()">🖨️ Printează / Salvează PDF</button>
+      </div>`);
+  }
+
   /* ---------- Profil (poză de profil) ---------- */
   function openProfile(u) {
     const rating = u.role === "executant" ? S.ratingOf(u.id) : null;
@@ -2089,15 +2198,42 @@ body.landing-active { background: var(--h-bg); }
         ${u.avatar ? `<button class="btn btn-soft btn-danger" id="avRemove">Șterge poza</button>` : ""}
       </div>
     `);
-    $("#avFile").onchange = (e) => {
-      const f = e.target.files[0]; if (!f) return;
-      if (f.size > C.maxAvatarBytes) return toast("Poza e prea mare (max " + Math.round(C.maxAvatarBytes / 1024 / 1024) + " MB).", "err");
-      const reader = new FileReader();
-      reader.onload = () => { S.setAvatar(u.id, reader.result); toast("Poză de profil salvată.", "ok"); closeModal(); renderApp(); };
-      reader.readAsDataURL(f);
-    };
+    $("#avFile").onchange = (e) => readAvatarFile(e.target.files[0], (dataUrl) => {
+      if (!dataUrl) return;
+      S.setAvatar(u.id, dataUrl); toast("Poză de profil salvată.", "ok"); closeModal(); renderApp();
+    });
     const rm = $("#avRemove");
     if (rm) rm.onclick = () => { S.setAvatar(u.id, null); toast("Poză ștearsă.", ""); closeModal(); renderApp(); };
+  }
+
+  /* Poză de profil OBLIGATORIE — modal care nu se poate închide fără o poză (toți userii) */
+  function requireAvatar(u) {
+    modal(`
+      <h2>Adaugă o poză de profil</h2>
+      <p class="sub">Pentru a continua, toți utilizatorii trebuie să aibă o poză de profil.</p>
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
+        <span id="raPreview">${avatarHtml(u, 72)}</span>
+        <div class="hint">Alege o imagine · max ${Math.round(C.maxAvatarBytes / 1024 / 1024)} MB</div>
+      </div>
+      <div class="field"><input type="file" id="raFile" accept="image/*" /></div>
+      <div class="btn-row"><button class="btn btn-block" id="raSave" disabled>Salvează și continuă</button></div>
+    `);
+    // nu se poate închide prin click în afară — poza e obligatorie
+    document.getElementById("modalOverlay").onclick = null;
+    let dataUrl = null;
+    $("#raFile").onchange = (e) => readAvatarFile(e.target.files[0], (durl) => {
+      if (!durl) return;
+      dataUrl = durl;
+      const pv = $("#raPreview"); if (pv) pv.innerHTML = `<img src="${dataUrl}" style="width:72px;height:72px;border-radius:50%;object-fit:cover" alt="">`;
+      const sv = $("#raSave"); if (sv) sv.disabled = false;
+    });
+    $("#raSave").onclick = async () => {
+      if (!dataUrl) return toast("Alege o poză de profil.", "err");
+      S.setAvatar(u.id, dataUrl);
+      await S.flush();
+      toast("Poză de profil salvată.", "ok");
+      closeModal(); renderApp();
+    };
   }
 
   /* =========================================================
@@ -4758,6 +4894,12 @@ body.landing-active { background: var(--h-bg); }
     ["Devino serviciu de lenjerie", "Become a linen service", "बेडसिट सेवा बन्नुहोस्"],
     ["Preiei rute din zona ta după înregistrare.", "Take routes in your area after signing up.", "दर्ता पछि आफ्नो क्षेत्रका रूटहरू लिनुहोस्।"],
     ["🔗 Distribuie", "🔗 Share", "🔗 सेयर गर्नुहोस्"],
+    ["📄 Contract", "📄 Contract", "📄 सम्झौता"],
+    ["🖨️ Printează / Salvează PDF", "🖨️ Print / Save PDF", "🖨️ प्रिन्ट / PDF सुरक्षित"],
+    ["Adaugă o poză de profil", "Add a profile photo", "प्रोफाइल फोटो थप्नुहोस्"],
+    ["Pentru a continua, toți utilizatorii trebuie să aibă o poză de profil.", "To continue, all users must have a profile photo.", "जारी राख्न, सबै प्रयोगकर्ताको प्रोफाइल फोटो हुनुपर्छ।"],
+    ["Salvează și continuă", "Save and continue", "सुरक्षित गरी जारी राख्नुहोस्"],
+    ["Alege o poză de profil.", "Choose a profile photo.", "प्रोफाइल फोटो छान्नुहोस्।"],
     ["Zone", "Areas", "क्षेत्रहरू"],
     ["Acoperire", "Coverage", "कभरेज"],
     ["Zone cu Agenți Cleaning disponibili", "Areas with available Cleaning Agents", "उपलब्ध Cleaning Agent भएका क्षेत्रहरू"],
