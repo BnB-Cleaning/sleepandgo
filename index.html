@@ -392,6 +392,18 @@ a.pill.contact:hover { background: var(--brand); color: #fff; }
 .area-check input { width: 16px; height: 16px; flex: none; }
 @media (max-width: 560px) { .area-checks { grid-template-columns: 1fr; } }
 
+/* ===== Meniu de distribuire (share) ===== */
+.share-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 16px; }
+.share-opt { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 10px; border-radius: 12px; font-weight: 700; font-size: 14px; color: #fff !important; text-decoration: none; border: none; cursor: pointer; transition: transform .08s, filter .12s; }
+.share-opt:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.share-opt:active { transform: translateY(0); }
+.share-opt.wa { background: #25D366; }
+.share-opt.fb { background: #1877F2; }
+.share-opt.ms { background: linear-gradient(135deg, #00B2FF, #006AFF 60%, #A033FF); }
+.share-opt.sms { background: #16A34A; }
+.share-opt.em { background: #EA4335; }
+.share-opt.copy { background: #475569; grid-column: 1 / -1; }
+
 /* =========================================================
    Sleep & Go Cleaning — HOME / LANDING
    Brand preluat de pe sleepandgocleaning.com:
@@ -731,6 +743,7 @@ body.landing-active { background: var(--h-bg); }
     maxAvatarBytes: 1 * 1024 * 1024,
     // Zonele/orașele deservite — folosite la potrivirea Agent Cleaning ↔ solicitare
     areas: [
+      "București - Centrul Vechi",
       "București - Sector 1", "București - Sector 2", "București - Sector 3",
       "București - Sector 4", "București - Sector 5", "București - Sector 6",
       // Zone limitrofe Bucureștiului (Ilfov)
@@ -1686,20 +1699,43 @@ body.landing-active { background: var(--h-bg); }
   const fmtDur = (min) => { if (min == null) return "—"; const h = Math.floor(min / 60), m = min % 60; return h ? `${h}h ${m}min` : `${m}min`; };
   const initials = (name) => String(name || "?").trim().split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase();
 
-  // Distribuie pagina: share nativ pe mobil, copiere link pe desktop
-  function shareSite() {
-    const url = (location.origin && location.origin !== "null") ? location.origin + "/" : location.href;
-    const data = { title: "Sleep & Go Cleaning", text: "Curățenie în regim hotelier — Sleep & Go Cleaning", url };
-    if (navigator.share) {
-      navigator.share(data).catch(() => {});
-    } else if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(() => toast("Link copiat în clipboard!", "ok")).catch(() => toast(url, ""));
-    } else {
-      const t = document.createElement("textarea"); t.value = url; t.style.position = "fixed"; t.style.opacity = "0";
-      document.body.appendChild(t); t.focus(); t.select();
-      try { document.execCommand("copy"); toast("Link copiat în clipboard!", "ok"); } catch (e) { toast(url, ""); }
-      document.body.removeChild(t);
+  // copiază un text în clipboard (cu fallback pentru browsere vechi)
+  function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => toast("Link copiat!", "ok")).catch(() => toast(text, ""));
+      return;
     }
+    const t = document.createElement("textarea"); t.value = text; t.style.position = "fixed"; t.style.opacity = "0";
+    document.body.appendChild(t); t.focus(); t.select();
+    try { document.execCommand("copy"); toast("Link copiat!", "ok"); } catch (e) { toast(text, ""); }
+    document.body.removeChild(t);
+  }
+  // Distribuie pagina: meniu cu WhatsApp / Facebook / Messenger / SMS / Email / Copiază
+  function shareSite() {
+    const url = (location.origin && location.origin !== "null") ? location.origin + location.pathname : location.href;
+    const title = "Sleep & Go Cleaning";
+    const text = "Curățenie în regim hotelier — Sleep & Go Cleaning";
+    const eBoth = encodeURIComponent(text + " " + url);
+    const eUrl = encodeURIComponent(url);
+    const wa = `https://wa.me/?text=${eBoth}`;
+    const fb = `https://www.facebook.com/sharer/sharer.php?u=${eUrl}`;
+    const ms = `fb-messenger://share/?link=${eUrl}`;
+    const sms = `sms:?&body=${eBoth}`;
+    const email = `mailto:?subject=${encodeURIComponent(title)}&body=${eBoth}`;
+    modal(`
+      <h2>Distribuie</h2>
+      <p class="sub">Trimite linkul prietenilor sau partenerilor.</p>
+      <div class="share-grid">
+        <a class="share-opt wa" href="${wa}" target="_blank" rel="noopener">💬 WhatsApp</a>
+        <a class="share-opt fb" href="${fb}" target="_blank" rel="noopener">👍 Facebook</a>
+        <a class="share-opt ms" href="${ms}" target="_blank" rel="noopener">💬 Messenger</a>
+        <a class="share-opt sms" href="${sms}">✉️ SMS</a>
+        <a class="share-opt em" href="${email}">📧 Email</a>
+        <button class="share-opt copy" type="button" id="shareCopy">🔗 Copiază link</button>
+      </div>
+      <div class="btn-row"><button class="btn btn-soft btn-block" onclick="_closeModal()">Închide</button></div>
+    `);
+    const cp = $("#shareCopy"); if (cp) cp.onclick = () => copyToClipboard(url);
   }
   const telHref = (p) => "tel:" + String(p || "").replace(/[^\d+]/g, "");
   const wazeUrl = (addr) => `https://waze.com/ul?q=${encodeURIComponent(addr)}&navigate=yes`;
@@ -4575,6 +4611,11 @@ body.landing-active { background: var(--h-bg); }
     ["Devino serviciu de lenjerie", "Become a linen service", "बेडसिट सेवा बन्नुहोस्"],
     ["Preiei rute din zona ta după înregistrare.", "Take routes in your area after signing up.", "दर्ता पछि आफ्नो क्षेत्रका रूटहरू लिनुहोस्।"],
     ["🔗 Distribuie", "🔗 Share", "🔗 सेयर गर्नुहोस्"],
+    ["Distribuie", "Share", "सेयर गर्नुहोस्"],
+    ["Trimite linkul prietenilor sau partenerilor.", "Send the link to friends or partners.", "साथी वा साझेदारलाई लिङ्क पठाउनुहोस्।"],
+    ["🔗 Copiază link", "🔗 Copy link", "🔗 लिङ्क प्रतिलिपि गर्नुहोस्"],
+    ["Link copiat!", "Link copied!", "लिङ्क प्रतिलिपि भयो!"],
+    ["Închide", "Close", "बन्द गर्नुहोस्"],
     ["🧺 Lenjeria mea", "🧺 My linen", "🧺 मेरो बेडसिट"],
     ["Total seturi introduse", "Total sets introduced", "जम्मा सेट राखिएको"],
     ["🏠 În locație", "🏠 At the location", "🏠 स्थानमा"],
