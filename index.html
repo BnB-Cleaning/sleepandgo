@@ -1780,7 +1780,22 @@ body.landing-active { background: var(--h-bg); }
   let regRole = "solicitant";
   let regBiz = "SRL";
   let landing = true;
-  let landingView = "home";  // "home" | "executant"
+  let landingView = "home";  // "home" | "executant" | "spalatorie"
+
+  // Rutare pe URL: linkuri directe către fiecare landing (serverul servește index.html pe orice cale)
+  const LANDING_PATHS = { home: "/", executant: "/agenti-cleaning", spalatorie: "/serviciu-lenjerie" };
+  function pathToView(p) {
+    p = String(p || "/").replace(/\/+$/, "") || "/";
+    if (p === "/agenti-cleaning" || p === "/agenti") return "executant";
+    if (p === "/serviciu-lenjerie" || p === "/lenjerie") return "spalatorie";
+    return "home";
+  }
+  // schimbă landing-ul ȘI actualizează URL-ul, ca să poată fi copiat/distribuit
+  function setLandingView(v, push) {
+    landingView = v;
+    const path = LANDING_PATHS[v] || "/";
+    try { if (push !== false && location.pathname !== path) history.pushState({ v }, "", path); } catch (e) {}
+  }
 
   function goAuth(tab) { landing = false; authTab = tab || "login"; renderAuth(); }
 
@@ -2251,7 +2266,7 @@ body.landing-active { background: var(--h-bg); }
       if (t === "top") { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
       goAuth(t);
     });
-    app.querySelectorAll("[data-view]").forEach(a => a.onclick = () => { landingView = a.dataset.view; window.scrollTo(0, 0); renderApp(); });
+    app.querySelectorAll("[data-view]").forEach(a => a.onclick = () => { setLandingView(a.dataset.view); window.scrollTo(0, 0); renderApp(); });
     app.querySelectorAll("[data-share]").forEach(b => b.onclick = shareSite);
     app.querySelectorAll("[data-scroll]").forEach(a => a.onclick = () => {
       const target = document.getElementById(a.dataset.scroll);
@@ -2476,8 +2491,8 @@ body.landing-active { background: var(--h-bg); }
       </div>
     `));
 
-    app.querySelectorAll("[data-home]").forEach(a => a.onclick = () => { landingView = "home"; window.scrollTo(0, 0); renderHome(); });
-    app.querySelectorAll("[data-view]").forEach(a => a.onclick = () => { landingView = a.dataset.view; window.scrollTo(0, 0); renderApp(); });
+    app.querySelectorAll("[data-home]").forEach(a => a.onclick = () => { setLandingView("home"); window.scrollTo(0, 0); renderHome(); });
+    app.querySelectorAll("[data-view]").forEach(a => a.onclick = () => { setLandingView(a.dataset.view); window.scrollTo(0, 0); renderApp(); });
     app.querySelectorAll("[data-share]").forEach(b => b.onclick = shareSite);
     app.querySelectorAll("[data-reg]").forEach(b => b.onclick = () => { regRole = b.dataset.reg; goAuth("register"); });
     app.querySelectorAll("[data-go]").forEach(b => b.onclick = () => goAuth(b.dataset.go));
@@ -2663,8 +2678,8 @@ body.landing-active { background: var(--h-bg); }
       </div>
     `));
 
-    app.querySelectorAll("[data-home]").forEach(a => a.onclick = () => { landingView = "home"; window.scrollTo(0, 0); renderHome(); });
-    app.querySelectorAll("[data-view]").forEach(a => a.onclick = () => { landingView = a.dataset.view; window.scrollTo(0, 0); renderApp(); });
+    app.querySelectorAll("[data-home]").forEach(a => a.onclick = () => { setLandingView("home"); window.scrollTo(0, 0); renderHome(); });
+    app.querySelectorAll("[data-view]").forEach(a => a.onclick = () => { setLandingView(a.dataset.view); window.scrollTo(0, 0); renderApp(); });
     app.querySelectorAll("[data-share]").forEach(b => b.onclick = shareSite);
     app.querySelectorAll("[data-reg]").forEach(b => b.onclick = () => { regRole = b.dataset.reg; goAuth("register"); });
     app.querySelectorAll("[data-go]").forEach(b => b.onclick = () => goAuth(b.dataset.go));
@@ -4808,9 +4823,20 @@ body.landing-active { background: var(--h-bg); }
     }
   }
 
+  // back/forward al browserului între landing-uri
+  window.addEventListener("popstate", () => {
+    if (S.currentUser()) return;                 // logat → dashboard, nu landing
+    setLandingView(pathToView(location.pathname), false);
+    landing = true; window.scrollTo(0, 0); renderApp();
+  });
+
   S.init(() => { try { renderApp(); } catch (e) {} })
-    .then(async () => { await handlePaymentReturn(); renderApp(); initLang(); })
-    .catch(() => { renderApp(); initLang(); });
+    .then(async () => {
+      await handlePaymentReturn();
+      landingView = pathToView(location.pathname);   // deschide landing-ul din URL (link direct)
+      renderApp(); initLang();
+    })
+    .catch(() => { landingView = pathToView(location.pathname); renderApp(); initLang(); });
 })();
 
 </script>
