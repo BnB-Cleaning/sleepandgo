@@ -1631,7 +1631,7 @@ body.landing-active { background: var(--h-bg); }
 
     createLocation(data) {
       if (!data.name || !data.address || !data.sqm) return { ok: false, error: "Completează denumirea, adresa și suprafața." };
-      if (!data.doc || !data.doc.name) return { ok: false, error: "Atașează dovada locației (extras CF / contract vânzare / închiriere)." };
+      if (!data.doc || !data.doc.name) return { ok: false, error: "Atașează dovada suprafeței (extras CF / contract / declarație pe propria răspundere)." };
       if (!data.mapsUrl) return { ok: false, error: "Adaugă linkul Google Maps al locației." };
       const ci = data.checkin || {};
       if (!ci.interfon || !ci.lockbox) return { ok: false, error: "Completează detaliile de check-in: cod interfon și cod lockbox / yală electrică." };
@@ -3227,9 +3227,9 @@ body.landing-active { background: var(--h-bg); }
               <div class="hint">Valoarea trebuie să corespundă documentului. Administratorul o validează.</div>
             </div>
             <div class="field">
-              <label>Dovadă drept asupra locației</label>
+              <label>Dovadă suprafață locație (m²)</label>
               <input type="file" name="doc" accept="image/*,application/pdf" required />
-              <div class="hint">Extras carte funciară, contract de vânzare-cumpărare sau contract de închiriere — confirmă și suprafața. PDF sau poză (poți fotografia documentul cu telefonul). Max ${Math.round(C.maxDocBytes / 1024 / 1024)} MB.</div>
+              <div class="hint">Document din care reiese <strong>suprafața (m²)</strong>: extras carte funciară, contract de vânzare-cumpărare, contract de închiriere <strong>sau o declarație pe propria răspundere</strong>. PDF sau poză (poți fotografia documentul cu telefonul). Max ${Math.round(C.maxDocBytes / 1024 / 1024)} MB.</div>
             </div>
             <div class="divider"></div>
             <div class="section-title" style="margin-top:0">🔑 Detalii check-in (obligatoriu)</div>
@@ -4934,6 +4934,7 @@ body.landing-active { background: var(--h-bg); }
     ["🔗 Distribuie", "🔗 Share", "🔗 सेयर गर्नुहोस्"],
     ["📄 Contract", "📄 Contract", "📄 सम्झौता"],
     ["Dovadă drept asupra locației", "Proof of right to the property", "स्थानमाथिको अधिकारको प्रमाण"],
+    ["Dovadă suprafață locație (m²)", "Proof of the property's surface (m²)", "स्थानको क्षेत्रफल प्रमाण (m²)"],
     ["Link anunț Booking / Airbnb (recomandat)", "Booking / Airbnb listing link (recommended)", "Booking / Airbnb लिस्टिङ लिंक (सिफारिस)"],
     ["🖨️ Printează / Salvează PDF", "🖨️ Print / Save PDF", "🖨️ प्रिन्ट / PDF सुरक्षित"],
     ["Adaugă o poză de profil", "Add a profile photo", "प्रोफाइल फोटो थप्नुहोस्"],
