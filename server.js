@@ -266,7 +266,7 @@ app.post("/api/pay/webhook", express.raw({ type: "application/json" }), async (r
   res.json({ received: true });
 });
 
-app.use(express.json({ limit: "6mb" }));
+app.use(express.json({ limit: "25mb" }));
 
 // --- Auth ---
 app.post("/api/auth/register", async (req, res) => {
