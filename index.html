@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Sleep &amp; Go Cleaning — Curățenie regim hotelier</title>
 <meta name="description" content="Curățenie regim hotelier la cerere: adaugă locația, programează și plătește în avans." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2064%2064'%3E%3Crect%20width='64'%20height='64'%20rx='14'%20fill='%23009FE3'/%3E%3Ctext%20x='32'%20y='45'%20font-size='36'%20text-anchor='middle'%3E%F0%9F%A7%BD%3C/text%3E%3C/svg%3E" />
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2064%2064'%3E%3Crect%20width='64'%20height='64'%20rx='14'%20fill='%23009FE3'/%3E%3Ctext%20x='32'%20y='45'%20font-size='36'%20text-anchor='middle'%3E%F0%9F%A7%BD%3C/text%3E%3C/svg%3E" />
+<meta name="theme-color" content="#009FE3" />
 </head>
 <body>
 <style>
@@ -1594,8 +1597,13 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     },
     // Injectează articolele de start dacă starea de pe server nu are încă blog.
     _ensureBlog() { if (!Array.isArray(db.blog)) { db.blog = STARTER_BLOG(); save(db); } return db.blog; },
-    blogAll() { return this._ensureBlog().slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); },
-    blogPublished() { return this.blogAll().filter(p => p.published !== false); },
+    blogAll() { return this._ensureBlog().slice().sort((a, b) => (b.publishAt || b.createdAt || 0) - (a.publishAt || a.createdAt || 0)); },
+    // Public: publicat ȘI (fără programare SAU momentul programat a trecut).
+    blogPublished() { return this.blogAll().filter(p => p.published !== false && (!p.publishAt || p.publishAt <= Date.now())); },
+    // Programat = publicat, dar cu data de publicare în viitor.
+    blogIsScheduled(p) { return p && p.published !== false && p.publishAt && p.publishAt > Date.now(); },
+    // Data efectivă (programată sau de creare) — pentru afișare și SEO.
+    blogEffectiveDate(p) { return (p && (p.publishAt || p.createdAt)) || Date.now(); },
     blogBySlug(slug) { return this._ensureBlog().find(p => p.slug === slug) || null; },
     blogById(id) { return this._ensureBlog().find(p => p.id === id) || null; },
     // FAQ pentru AEO/GEO: perechi întrebare/răspuns, folosite și în JSON-LD FAQPage.
@@ -1603,6 +1611,12 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       if (!Array.isArray(faq)) return [];
       return faq.map(x => ({ q: String((x && x.q) || "").trim(), a: String((x && x.a) || "").trim() }))
         .filter(x => x.q && x.a).slice(0, 12);
+    },
+    // Normalizează o dată de programare (ms, ISO sau "YYYY-MM-DDTHH:MM") → ms sau null.
+    _normTs(v) {
+      if (v == null || v === "") return null;
+      const t = (typeof v === "number") ? v : Date.parse(v);
+      return isFinite(t) ? t : null;
     },
     addBlogPost(data) {
       this._ensureBlog();
@@ -1619,6 +1633,7 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         metaDescription: String(data.metaDescription || "").trim(),
         keywords: String(data.keywords || "").trim(),
         faq: this._normFaq(data.faq),
+        publishAt: this._normTs(data.publishAt),   // null = imediat; viitor = programat
         createdAt: Date.now(), updatedAt: Date.now(),
       };
       db.blog.push(post); save(db); return post;
@@ -1635,6 +1650,7 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       if (data.metaDescription != null) p.metaDescription = String(data.metaDescription).trim();
       if (data.keywords != null) p.keywords = String(data.keywords).trim();
       if (data.faq != null) p.faq = this._normFaq(data.faq);
+      if ("publishAt" in data) p.publishAt = this._normTs(data.publishAt);
       p.updatedAt = Date.now(); save(db); return p;
     },
     deleteBlogPost(id) { this._ensureBlog(); db.blog = db.blog.filter(p => p.id !== id); save(db); },
@@ -2842,7 +2858,7 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     return `<a class="blog-card" data-article="${esc(p.slug)}">
       ${blogCoverHtml(p)}
       <div class="bc-body">
-        <div class="bc-date">${blogDate(p.createdAt)}</div>
+        <div class="bc-date">${blogDate(p.publishAt || p.createdAt)}</div>
         <h3>${esc(p.title)}</h3>
         <p>${esc(p.excerpt || "")}</p>
         <span class="bc-more">Citește →</span>
@@ -2959,8 +2975,8 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     setMeta("property", "og:url", url);
     setMeta("property", "og:locale", "ro_RO");
     if (img) setMeta("property", "og:image", img);
-    setMeta("property", "article:published_time", new Date(p.createdAt || Date.now()).toISOString());
-    setMeta("property", "article:modified_time", new Date(p.updatedAt || p.createdAt || Date.now()).toISOString());
+    setMeta("property", "article:published_time", new Date(p.publishAt || p.createdAt || Date.now()).toISOString());
+    setMeta("property", "article:modified_time", new Date(p.updatedAt || p.publishAt || p.createdAt || Date.now()).toISOString());
     setMeta("name", "twitter:card", img ? "summary_large_image" : "summary");
     setMeta("name", "twitter:title", title);
     setMeta("name", "twitter:description", desc);
@@ -2968,8 +2984,8 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     const article = {
       "@context": "https://schema.org", "@type": "Article",
       headline: title, description: desc,
-      datePublished: new Date(p.createdAt || Date.now()).toISOString(),
-      dateModified: new Date(p.updatedAt || p.createdAt || Date.now()).toISOString(),
+      datePublished: new Date(p.publishAt || p.createdAt || Date.now()).toISOString(),
+      dateModified: new Date(p.updatedAt || p.publishAt || p.createdAt || Date.now()).toISOString(),
       author: { "@type": "Organization", name: SITE_NAME, url: siteOrigin() },
       publisher: { "@type": "Organization", name: SITE_NAME, url: siteOrigin() },
       mainEntityOfPage: { "@type": "WebPage", "@id": url },
@@ -3051,7 +3067,7 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         <article class="blog-article"><div class="wrap">
           <a class="ba-back" data-view="blog">← Toate articolele</a>
           ${blogCoverHtml(p, true)}
-          <div class="ba-date">${blogDate(p.createdAt)} · ${esc(p.author || "Sleep & Go Cleaning")}</div>
+          <div class="ba-date">${blogDate(p.publishAt || p.createdAt)} · ${esc(p.author || "Sleep & Go Cleaning")}</div>
           <h1>${esc(p.title)}</h1>
           ${p.excerpt ? `<p class="ba-lead">${esc(p.excerpt)}</p>` : ""}
           <div class="ba-body">${blogBodyHtml(p.body)}</div>
@@ -4437,9 +4453,13 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
           <div style="flex:1;min-width:200px">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
               <strong>${esc(p.title)}</strong>
-              ${p.published !== false ? `<span class="badge ok" style="font-size:11px">Publicat</span>` : `<span class="badge" style="font-size:11px;background:#eab;color:#633">Ciornă</span>`}
+              ${p.published === false
+                ? `<span class="badge" style="font-size:11px;background:#eab;color:#633">Ciornă</span>`
+                : (S.blogIsScheduled(p)
+                  ? `<span class="badge" style="font-size:11px;background:#f5d78a;color:#6b4e00">🗓️ Programat</span>`
+                  : `<span class="badge ok" style="font-size:11px">Publicat</span>`)}
             </div>
-            <div class="hint" style="color:var(--muted,#8aa);font-size:12px">${blogDate(p.createdAt)} · /blog/${esc(p.slug)}</div>
+            <div class="hint" style="color:var(--muted,#8aa);font-size:12px">${S.blogIsScheduled(p) ? "Se publică: " : ""}${blogDate(p.publishAt || p.createdAt)}${S.blogIsScheduled(p) ? " " + new Date(p.publishAt).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" }) : ""} · /blog/${esc(p.slug)}</div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-soft btn-sm" data-blogview="${esc(p.slug)}">👁️ Vezi</button>
@@ -4463,6 +4483,8 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     const p = post || {};
     let cover = p.cover || "🧽";
     const faq0 = Array.isArray(p.faq) ? p.faq : [];
+    // ms → valoare pentru <input type="datetime-local"> (ora locală)
+    const dtLocal = (ms) => { if (!ms) return ""; const d = new Date(ms), z = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`; };
     const faqRow = (q, a) => `
       <div class="faq-row" style="border:1px solid var(--line,#2b3648);border-radius:10px;padding:10px;margin-bottom:8px">
         <input class="faqQ" value="${esc(q || "")}" placeholder="Întrebare (ex: Cât costă curățenia în regim hotelier?)" style="margin-bottom:6px" />
@@ -4500,7 +4522,12 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         </div>
       </div>
 
-      <label style="display:flex;align-items:center;gap:8px;margin:6px 0 14px"><input type="checkbox" id="blPub" ${p.published === false ? "" : "checked"}> Publicat (vizibil pe site)</label>
+      <div class="field" style="margin-top:6px">
+        <label>🗓️ Programează publicarea <small style="color:var(--muted,#8aa)">(opțional)</small></label>
+        <input type="datetime-local" id="blSchedule" value="${dtLocal(p.publishAt)}" />
+        <p class="hint" style="color:var(--muted,#8aa);font-size:12px;margin-top:4px">Gol = se publică imediat. O dată în viitor = articolul devine public automat la acel moment.</p>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;margin:6px 0 14px"><input type="checkbox" id="blPub" ${p.published === false ? "" : "checked"}> Publicat (dacă e programat, apare la data setată)</label>
       <div class="btn-row">
         <button class="btn" id="blCancel">Anulează</button>
         <button class="btn" id="blSave">${post ? "Salvează" : "Publică"}</button>
@@ -4545,10 +4572,12 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         metaDescription: box.querySelector("#blMeta").value,
         keywords: box.querySelector("#blKw").value,
         faq,
+        publishAt: box.querySelector("#blSchedule").value || null,
       };
       if (post) S.updateBlogPost(post.id, data); else S.addBlogPost(data);
       await S.flush();
-      closeModal(); toast(post ? "Articol salvat." : "Articol publicat.", "ok");
+      const sched = data.publishAt && Date.parse(data.publishAt) > Date.now();
+      closeModal(); toast(sched ? "Articol programat." : (post ? "Articol salvat." : "Articol publicat."), "ok");
       renderAdmin(S.currentUser());
     };
   }

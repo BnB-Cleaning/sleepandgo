@@ -436,7 +436,8 @@ app.get("/robots.txt", (req, res) => {
 app.get("/sitemap.xml", async (req, res) => {
   try {
     const st = await getState();
-    const posts = Array.isArray(st.blog) ? st.blog.filter(p => p && p.published !== false) : [];
+    const now = Date.now();
+    const posts = Array.isArray(st.blog) ? st.blog.filter(p => p && p.published !== false && (!p.publishAt || p.publishAt <= now)) : [];
     const iso = (t) => new Date(t || Date.now()).toISOString();
     const xmlEsc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const staticUrls = [
@@ -449,7 +450,7 @@ app.get("/sitemap.xml", async (req, res) => {
     ];
     const urls = [
       ...staticUrls.map(u => `  <url><loc>${SITE_URL}${u.loc}</loc><changefreq>${u.cf}</changefreq><priority>${u.pr}</priority></url>`),
-      ...posts.map(p => `  <url><loc>${SITE_URL}/blog/${xmlEsc(encodeURIComponent(p.slug))}</loc><lastmod>${iso(p.updatedAt || p.createdAt)}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>`),
+      ...posts.map(p => `  <url><loc>${SITE_URL}/blog/${xmlEsc(encodeURIComponent(p.slug))}</loc><lastmod>${iso(p.updatedAt || p.publishAt || p.createdAt)}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>`),
     ];
     res.type("application/xml").send(
       `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join("\n")}\n</urlset>\n`
