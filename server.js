@@ -426,6 +426,39 @@ app.post("/api/lead", async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
+// --- SEO: robots.txt + sitemap.xml dinamic (listează articolele de blog) ---
+const SITE_URL = (process.env.SITE_URL || "https://www.sleepandgocleaning.com").replace(/\/+$/, "");
+
+app.get("/robots.txt", (req, res) => {
+  res.type("text/plain").send(`User-agent: *\nAllow: /\n\nSitemap: ${SITE_URL}/sitemap.xml\n`);
+});
+
+app.get("/sitemap.xml", async (req, res) => {
+  try {
+    const st = await getState();
+    const posts = Array.isArray(st.blog) ? st.blog.filter(p => p && p.published !== false) : [];
+    const iso = (t) => new Date(t || Date.now()).toISOString();
+    const xmlEsc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const staticUrls = [
+      { loc: "/", pr: "1.0", cf: "weekly" },
+      { loc: "/agenti-cleaning", pr: "0.8", cf: "monthly" },
+      { loc: "/serviciu-lenjerie", pr: "0.8", cf: "monthly" },
+      { loc: "/blog", pr: "0.7", cf: "weekly" },
+      { loc: "/despre-noi", pr: "0.5", cf: "yearly" },
+      { loc: "/termeni-si-conditii", pr: "0.3", cf: "yearly" },
+    ];
+    const urls = [
+      ...staticUrls.map(u => `  <url><loc>${SITE_URL}${u.loc}</loc><changefreq>${u.cf}</changefreq><priority>${u.pr}</priority></url>`),
+      ...posts.map(p => `  <url><loc>${SITE_URL}/blog/${xmlEsc(encodeURIComponent(p.slug))}</loc><lastmod>${iso(p.updatedAt || p.createdAt)}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>`),
+    ];
+    res.type("application/xml").send(
+      `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join("\n")}\n</urlset>\n`
+    );
+  } catch (e) {
+    res.status(500).type("text/plain").send("sitemap error");
+  }
+});
+
 // --- Aplicația (o singură pagină, self-contained) ---
 app.get("*", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
 

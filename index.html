@@ -739,6 +739,18 @@ body.landing-active { background: var(--h-bg); }
 .ba-foot { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 36px; padding-top: 26px; border-top: 1px solid #e6ecf3; }
 @media (max-width: 640px) { .blog-cover.big { height: 200px; font-size: 72px; } .ba-body { font-size: 16px; } }
 
+/* ===== FAQ în articol (AEO) ===== */
+.ba-faq { margin-top: 40px; padding-top: 28px; border-top: 1px solid #e6ecf3; }
+.ba-faq > h2 { font-family: 'Poppins', sans-serif; font-size: 24px; margin: 0 0 16px; color: var(--h-ink); }
+.faq-item { border: 1px solid #e6ecf3; border-radius: 12px; padding: 4px 16px; margin-bottom: 10px; background: #fff; }
+.faq-item > summary { cursor: pointer; font-weight: 600; font-size: 16.5px; padding: 14px 0; color: var(--h-ink); list-style: none; position: relative; padding-right: 28px; }
+.faq-item > summary::-webkit-details-marker { display: none; }
+.faq-item > summary::after { content: "+"; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-size: 22px; color: var(--h-blue); font-weight: 400; }
+.faq-item[open] > summary::after { content: "–"; }
+.faq-item .faq-a { padding: 0 0 14px; color: #3a4653; line-height: 1.65; }
+.faq-item .faq-a p { margin: 0 0 10px; }
+.faq-item .faq-a ul { margin: 0 0 10px; padding-left: 20px; }
+
 </style>
 
   <header class="topbar" id="topbar" hidden>
@@ -1586,6 +1598,12 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     blogPublished() { return this.blogAll().filter(p => p.published !== false); },
     blogBySlug(slug) { return this._ensureBlog().find(p => p.slug === slug) || null; },
     blogById(id) { return this._ensureBlog().find(p => p.id === id) || null; },
+    // FAQ pentru AEO/GEO: perechi întrebare/răspuns, folosite și în JSON-LD FAQPage.
+    _normFaq(faq) {
+      if (!Array.isArray(faq)) return [];
+      return faq.map(x => ({ q: String((x && x.q) || "").trim(), a: String((x && x.a) || "").trim() }))
+        .filter(x => x.q && x.a).slice(0, 12);
+    },
     addBlogPost(data) {
       this._ensureBlog();
       const title = String(data.title || "").trim() || "Articol fără titlu";
@@ -1596,6 +1614,11 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         cover: data.cover || "🧽",
         author: String(data.author || "Sleep & Go Cleaning").trim(),
         published: data.published !== false,
+        // ── SEO / AEO / GEO ──
+        seoTitle: String(data.seoTitle || "").trim(),
+        metaDescription: String(data.metaDescription || "").trim(),
+        keywords: String(data.keywords || "").trim(),
+        faq: this._normFaq(data.faq),
         createdAt: Date.now(), updatedAt: Date.now(),
       };
       db.blog.push(post); save(db); return post;
@@ -1608,6 +1631,10 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       if (data.cover != null) p.cover = data.cover;
       if (data.author != null) p.author = String(data.author).trim();
       if (data.published != null) p.published = !!data.published;
+      if (data.seoTitle != null) p.seoTitle = String(data.seoTitle).trim();
+      if (data.metaDescription != null) p.metaDescription = String(data.metaDescription).trim();
+      if (data.keywords != null) p.keywords = String(data.keywords).trim();
+      if (data.faq != null) p.faq = this._normFaq(data.faq);
       p.updatedAt = Date.now(); save(db); return p;
     },
     deleteBlogPost(id) { this._ensureBlog(); db.blog = db.blog.filter(p => p.id !== id); save(db); },
@@ -1926,7 +1953,6 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     const fb = `https://www.facebook.com/sharer/sharer.php?u=${eUrl}`;
     const ms = `fb-messenger://share/?link=${eUrl}`;
     const sms = `sms:?&body=${eBoth}`;
-    const email = `mailto:?subject=${encodeURIComponent(title)}&body=${eBoth}`;
     modal(`
       <h2>Distribuie</h2>
       <p class="sub">Trimite linkul prietenilor sau partenerilor.</p>
@@ -1935,7 +1961,6 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         <a class="share-opt fb" href="${fb}" target="_blank" rel="noopener">👍 Facebook</a>
         <a class="share-opt ms" href="${ms}" target="_blank" rel="noopener">💬 Messenger</a>
         <a class="share-opt sms" href="${sms}">✉️ SMS</a>
-        <a class="share-opt em" href="${email}">📧 Email</a>
         <button class="share-opt copy" type="button" id="shareCopy">🔗 Copiază link</button>
       </div>
       <div class="btn-row"><button class="btn btn-soft btn-block" onclick="_closeModal()">Închide</button></div>
@@ -2026,12 +2051,14 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
   let currentArticleSlug = null;  // articolul deschis pe /blog/<slug>
 
   // Rutare pe URL: linkuri directe către fiecare landing (serverul servește index.html pe orice cale)
-  const LANDING_PATHS = { home: "/", executant: "/agenti-cleaning", spalatorie: "/serviciu-lenjerie", blog: "/blog" };
+  const LANDING_PATHS = { home: "/", executant: "/agenti-cleaning", spalatorie: "/serviciu-lenjerie", blog: "/blog", termeni: "/termeni-si-conditii", despre: "/despre-noi" };
   function pathToView(p) {
     p = String(p || "/").replace(/\/+$/, "") || "/";
     if (p === "/agenti-cleaning" || p === "/agenti") return "executant";
     if (p === "/serviciu-lenjerie" || p === "/lenjerie") return "spalatorie";
     if (p === "/blog") return "blog";
+    if (p === "/termeni-si-conditii" || p === "/termeni") return "termeni";
+    if (p === "/despre-noi" || p === "/despre") return "despre";
     const m = p.match(/^\/blog\/(.+)$/);
     if (m) { currentArticleSlug = decodeURIComponent(m[1]); return "article"; }
     return "home";
@@ -2209,6 +2236,8 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       if (landingView === "spalatorie") return renderLaundryLanding();
       if (landingView === "blog") return renderBlogList();
       if (landingView === "article") return renderBlogArticle();
+      if (landingView === "termeni") return renderTermeni();
+      if (landingView === "despre") return renderDespre();
       return renderHome();
     }
     document.body.classList.remove("landing-active");
@@ -2439,6 +2468,7 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
   function renderHome() {
     topbar.hidden = true;
     document.body.classList.add("landing-active");
+    applyBasicSeo("Sleep & Go Cleaning — Curățenie regim hotelier București | 1 €/m²", "Firmă de curățenie în regim hotelier pentru închirieri pe termen scurt (Airbnb, Booking) în București: turnover complet între check-out și check-in, plată în avans, agenți verificați. De la 1 €/m².", "/");
     app.innerHTML = "";
     // preț de bază (off-peak, editabil din admin) → afișat live; vârf = +peakSurchargePct%
     const basePrice = S.pricePerSqm();
@@ -2665,25 +2695,6 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
           <p class="hint" style="text-align:center;margin-top:20px;color:var(--h-muted)">⏰ Solicitările se trimit până la ora 20:00.</p>
         </div></section>
 
-        <!-- Blog -->
-        ${(() => {
-          const posts = S.blogPublished().slice(0, 3);
-          if (!posts.length) return "";
-          return `<section class="h-section soft" id="blog"><div class="wrap">
-            <div class="h-section-head">
-              <div class="eyebrow">Resurse</div>
-              <h2>De pe blog</h2>
-              <p>Ghiduri practice despre curățenie în regim hotelier, lenjerii și rating.</p>
-            </div>
-            <div class="blog-grid">
-              ${posts.map(blogCardHtml).join("")}
-            </div>
-            <div style="text-align:center;margin-top:24px">
-              <a class="h-btn ghost lg" data-view="blog">Vezi toate articolele →</a>
-            </div>
-          </div></section>`;
-        })()}
-
         <!-- CTA band -->
         <section class="h-section"><div class="wrap">
           <div class="h-cta-band">
@@ -2711,11 +2722,17 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
               <a data-scroll="preturi">Prețuri</a>
             </div>
             <div>
-              <h4>Cont</h4>
+              <h4>Explorează</h4>
+              <a data-view="executant">Agenți Cleaning</a>
+              <a data-view="spalatorie">Serviciu lenjerie</a>
+              <a data-view="blog">Blog</a>
+            </div>
+            <div>
+              <h4>Companie</h4>
+              <a data-view="despre">Despre noi</a>
+              <a data-view="termeni">Termeni și condiții</a>
               <a data-go="login">Autentificare</a>
               <a data-go="register">Creează cont</a>
-              <a data-view="executant"><strong>Pentru Agenți Cleaning →</strong></a>
-              <a data-view="spalatorie"><strong>Serviciu de lenjerie →</strong></a>
             </div>
           </div>
           <div class="copyright">© 2026 Sleep &amp; Go Cleaning. Toate drepturile rezervate.</div>
@@ -2877,8 +2894,8 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     return `<footer class="h-footer"><div class="wrap">
       <div class="cols">
         <div><div class="foot-logo"><span>🧽</span> Sleep &amp; Go Cleaning</div><p>Curățenie profesională în regim hotelier pentru închirieri pe termen scurt.</p><p>📞 ${PHONE}</p></div>
-        <div><h4>Platformă</h4><a data-home>Acasă</a><a data-view="executant">Agenți Cleaning</a><a data-view="spalatorie">Serviciu lenjerie</a><a data-view="blog">Blog</a></div>
-        <div><h4>Cont</h4><a data-go="login">Autentificare</a><a data-go="register">Creează cont</a></div>
+        <div><h4>Explorează</h4><a data-home>Acasă</a><a data-view="executant">Agenți Cleaning</a><a data-view="spalatorie">Serviciu lenjerie</a><a data-view="blog">Blog</a></div>
+        <div><h4>Companie</h4><a data-view="despre">Despre noi</a><a data-view="termeni">Termeni și condiții</a><a data-go="login">Autentificare</a><a data-go="register">Creează cont</a></div>
       </div>
       <div class="copyright">© 2026 Sleep &amp; Go Cleaning. Toate drepturile rezervate.</div>
     </div></footer>`;
@@ -2891,9 +2908,112 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     app.querySelectorAll("[data-share]").forEach(b => b.onclick = shareSite);
   }
 
+  /* ---------- SEO / AEO / GEO: meta tags + Open Graph + JSON-LD ---------- */
+  const SITE_NAME = "Sleep & Go Cleaning";
+  function siteOrigin() {
+    try {
+      const o = location.origin;
+      // canonic pe www (domeniul principal)
+      if (/^https?:\/\/sleepandgocleaning\.com/i.test(o)) return o.replace("://", "://www.");
+      return o;
+    } catch (e) { return "https://www.sleepandgocleaning.com"; }
+  }
+  function setMeta(attr, key, content) {
+    let m = document.head.querySelector(`meta[${attr}="${key}"][data-seo]`);
+    if (!content) { if (m) m.remove(); return; }
+    if (!m) { m = document.createElement("meta"); m.setAttribute(attr, key); m.setAttribute("data-seo", "1"); document.head.appendChild(m); }
+    m.setAttribute("content", content);
+  }
+  function setLinkRel(rel, href) {
+    let l = document.head.querySelector(`link[rel="${rel}"][data-seo]`);
+    if (!href) { if (l) l.remove(); return; }
+    if (!l) { l = document.createElement("link"); l.setAttribute("rel", rel); l.setAttribute("data-seo", "1"); document.head.appendChild(l); }
+    l.setAttribute("href", href);
+  }
+  function setJsonLd(id, obj) {
+    let s = document.getElementById(id);
+    if (!obj) { if (s) s.remove(); return; }
+    if (!s) { s = document.createElement("script"); s.type = "application/ld+json"; s.id = id; document.head.appendChild(s); }
+    s.textContent = JSON.stringify(obj);
+  }
+  function clearSeo() {
+    document.head.querySelectorAll("meta[data-seo],link[data-seo]").forEach(n => n.remove());
+    ["ldArticle", "ldFaq", "ldBreadcrumb"].forEach(id => { const s = document.getElementById(id); if (s) s.remove(); });
+  }
+  const metaDescOf = (p) => (p.metaDescription || p.excerpt || "").slice(0, 300);
+  const seoTitleOf = (p) => (p.seoTitle || p.title || "").slice(0, 70);
+  const plainText = (md) => String(md || "").replace(/^##\s+/gm, "").replace(/^-\s+/gm, "").replace(/\s+/g, " ").trim();
+
+  function applyArticleSeo(p) {
+    clearSeo();
+    const url = siteOrigin() + "/blog/" + encodeURIComponent(p.slug);
+    const title = seoTitleOf(p), desc = metaDescOf(p);
+    const img = (typeof p.cover === "string" && /^https?:/i.test(p.cover)) ? p.cover : "";
+    try { document.title = title + " — " + SITE_NAME; } catch (e) {}
+    setMeta("name", "description", desc);
+    if (p.keywords) setMeta("name", "keywords", p.keywords);
+    setMeta("name", "robots", "index,follow,max-image-preview:large");
+    setLinkRel("canonical", url);
+    setMeta("property", "og:type", "article");
+    setMeta("property", "og:site_name", SITE_NAME);
+    setMeta("property", "og:title", title);
+    setMeta("property", "og:description", desc);
+    setMeta("property", "og:url", url);
+    setMeta("property", "og:locale", "ro_RO");
+    if (img) setMeta("property", "og:image", img);
+    setMeta("property", "article:published_time", new Date(p.createdAt || Date.now()).toISOString());
+    setMeta("property", "article:modified_time", new Date(p.updatedAt || p.createdAt || Date.now()).toISOString());
+    setMeta("name", "twitter:card", img ? "summary_large_image" : "summary");
+    setMeta("name", "twitter:title", title);
+    setMeta("name", "twitter:description", desc);
+    if (img) setMeta("name", "twitter:image", img);
+    const article = {
+      "@context": "https://schema.org", "@type": "Article",
+      headline: title, description: desc,
+      datePublished: new Date(p.createdAt || Date.now()).toISOString(),
+      dateModified: new Date(p.updatedAt || p.createdAt || Date.now()).toISOString(),
+      author: { "@type": "Organization", name: SITE_NAME, url: siteOrigin() },
+      publisher: { "@type": "Organization", name: SITE_NAME, url: siteOrigin() },
+      mainEntityOfPage: { "@type": "WebPage", "@id": url },
+      inLanguage: "ro-RO", articleBody: plainText(p.body),
+    };
+    if (p.keywords) article.keywords = p.keywords;
+    if (img) article.image = [img];
+    setJsonLd("ldArticle", article);
+    setJsonLd("ldBreadcrumb", {
+      "@context": "https://schema.org", "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Acasă", item: siteOrigin() + "/" },
+        { "@type": "ListItem", position: 2, name: "Blog", item: siteOrigin() + "/blog" },
+        { "@type": "ListItem", position: 3, name: p.title, item: url },
+      ],
+    });
+    if (Array.isArray(p.faq) && p.faq.length) {
+      setJsonLd("ldFaq", {
+        "@context": "https://schema.org", "@type": "FAQPage",
+        mainEntity: p.faq.map(f => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })),
+      });
+    } else setJsonLd("ldFaq", null);
+  }
+  function applyBasicSeo(title, desc, path) {
+    clearSeo();
+    const url = siteOrigin() + (path || "/");
+    try { document.title = title; } catch (e) {}
+    setMeta("name", "description", desc);
+    setMeta("name", "robots", "index,follow,max-image-preview:large");
+    setLinkRel("canonical", url);
+    setMeta("property", "og:type", "website");
+    setMeta("property", "og:site_name", SITE_NAME);
+    setMeta("property", "og:title", title);
+    setMeta("property", "og:description", desc);
+    setMeta("property", "og:url", url);
+    setMeta("property", "og:locale", "ro_RO");
+  }
+
   function renderBlogList() {
     topbar.hidden = true;
     document.body.classList.add("landing-active");
+    applyBasicSeo("Blog — curățenie regim hotelier | " + SITE_NAME, "Ghiduri practice de curățenie în regim hotelier: turnover între check-out și check-in, lenjerii, consumabile și cum îți crești rating-ul pe Airbnb și Booking.", "/blog");
     app.innerHTML = "";
     const posts = S.blogPublished();
     try { document.title = "Blog — Sleep & Go Cleaning"; } catch (e) {}
@@ -2924,7 +3044,8 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     app.innerHTML = "";
     const p = currentArticleSlug ? S.blogBySlug(currentArticleSlug) : null;
     const visible = p && p.published !== false;
-    if (visible) { try { document.title = p.title + " — Sleep & Go Cleaning"; } catch (e) {} }
+    if (visible) applyArticleSeo(p);
+    else { clearSeo(); try { document.title = "Articol negăsit — " + SITE_NAME; } catch (e) {} setMeta("name", "robots", "noindex,follow"); }
     app.appendChild(el(`
       <div class="home">
         ${blogChromeStart()}
@@ -2936,6 +3057,11 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
           <h1>${esc(p.title)}</h1>
           ${p.excerpt ? `<p class="ba-lead">${esc(p.excerpt)}</p>` : ""}
           <div class="ba-body">${blogBodyHtml(p.body)}</div>
+          ${(Array.isArray(p.faq) && p.faq.length) ? `
+          <section class="ba-faq">
+            <h2>Întrebări frecvente</h2>
+            ${p.faq.map(f => `<details class="faq-item"><summary>${esc(f.q)}</summary><div class="faq-a">${blogBodyHtml(f.a)}</div></details>`).join("")}
+          </section>` : ""}
           <div class="ba-foot">
             <button class="h-btn ghost" type="button" data-share>🔗 Distribuie articolul</button>
             <a class="h-btn primary" data-go="register">Începe cu Sleep &amp; Go</a>
@@ -2953,11 +3079,129 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
   }
 
   /* =========================================================
+     PAGINI STATICE (Despre noi, Termeni și condiții)
+     ========================================================= */
+  function renderStaticPage(title, seoDesc, path, innerHtml) {
+    topbar.hidden = true;
+    document.body.classList.add("landing-active");
+    applyBasicSeo(title, seoDesc, path);
+    app.innerHTML = "";
+    app.appendChild(el(`
+      <div class="home">
+        ${blogChromeStart()}
+        <article class="blog-article"><div class="wrap">
+          <a class="ba-back" data-home>← Pagina principală</a>
+          ${innerHtml}
+          <div class="ba-foot">
+            <a class="h-btn primary" data-go="register">Creează cont</a>
+            <a class="h-btn ghost" data-view="blog">Vezi blogul</a>
+          </div>
+        </div></article>
+        ${blogChromeEnd()}
+      </div>
+    `));
+    wireLandingLinks();
+  }
+
+  function renderDespre() {
+    renderStaticPage(
+      "Despre noi — Sleep & Go Cleaning",
+      "Sleep & Go Cleaning este platforma de curățenie în regim hotelier pentru închirieri pe termen scurt (Airbnb, Booking): turnover complet, agenți verificați, plată în avans. Administrată de SC GlobalApps SRL.",
+      "/despre-noi",
+      `<h1>Despre Sleep &amp; Go Cleaning</h1>
+      <p class="ba-lead">Curățenie profesională de regim hotelier, la o apăsare de buton — pentru proprietarii de închirieri pe termen scurt.</p>
+      <div class="ba-body">
+        <p>Sleep &amp; Go Cleaning este o platformă care conectează proprietarii de locații în regim hotelier (Airbnb, Booking) cu agenți de curățenie verificați, activi în zona lor. Scopul nostru e simplu: ca între check-out și check-in locația ta să fie mereu impecabilă și gata de oaspeți, fără să te ocupi tu de logistică.</p>
+
+        <h2>Ce facem</h2>
+        <p>Ne ocupăm de tot ce ține de întreținerea unei locații de închiriat pe termen scurt:</p>
+        <ul>
+          <li>Turnover complet: curățenie, schimbat lenjeria, pregătirea locației pentru următorii oaspeți.</li>
+          <li>Alimentare cu consumabile (hârtie igienică, apă, cafea, produse de curățenie).</li>
+          <li>Circuit de lenjerii etichetate individual, cu opțiune de închiriere.</li>
+          <li>Citirea și transmiterea indicilor de consum către furnizori.</li>
+        </ul>
+
+        <h2>Cum funcționează</h2>
+        <p>Adaugi locația, alegi data și intervalul orar, plătești în avans securizat. Agenții Cleaning din zona ta se înscriu la solicitare, iar tu îl alegi pe cel dorit — după rating și recenzii. La final, plata se eliberează automat către agent.</p>
+
+        <h2>Garanția noastră</h2>
+        <p>Dacă lucrarea nu este efectuată în intervalul orar rezervat, primești toți banii înapoi pentru acea solicitare, plus o compensație. Tu alegi ziua și intervalul, noi garantăm punctualitatea.</p>
+
+        <h2>Cine suntem</h2>
+        <p>Platforma <strong>Sleep &amp; Go Cleaning</strong> este administrată și facturată de <strong>S.C. GlobalApps S.R.L.</strong> (CUI 35751892, Reg. Com. J40/3223/2016). Lucrăm doar cu agenți verificați (PFA / PFI / SRL) și punem accent pe transparență: vezi prețul total înainte de a plăti, fără costuri ascunse.</p>
+
+        <h2>Contact</h2>
+        <p>Telefon: <a href="tel:${PHONE.replace(/\./g, "")}">${PHONE}</a></p>
+      </div>`
+    );
+  }
+
+  function renderTermeni() {
+    const azi = new Date().toLocaleDateString("ro-RO", { day: "numeric", month: "long", year: "numeric" });
+    renderStaticPage(
+      "Termeni și condiții — Sleep & Go Cleaning",
+      "Termenii și condițiile de utilizare a platformei Sleep & Go Cleaning (curățenie regim hotelier), administrată de SC GlobalApps SRL.",
+      "/termeni-si-conditii",
+      `<h1>Termeni și condiții</h1>
+      <p class="ba-lead">Condițiile de utilizare a platformei Sleep &amp; Go Cleaning. Prin crearea unui cont și utilizarea platformei, ești de acord cu acești termeni.</p>
+      <div class="ba-body">
+        <p><em>Ultima actualizare: ${azi}</em></p>
+
+        <h2>1. Operatorul platformei</h2>
+        <p>Platforma <strong>Sleep &amp; Go Cleaning</strong> (denumită în continuare „Platforma") este administrată, operată și facturată de <strong>S.C. GlobalApps S.R.L.</strong>, CUI 35751892, Reg. Com. J40/3223/2016 (denumită în continuare „Operatorul").</p>
+
+        <h2>2. Definiții</h2>
+        <ul>
+          <li><strong>Solicitant</strong> — proprietarul unei locații în regim hotelier care solicită servicii prin Platformă.</li>
+          <li><strong>Agent Cleaning</strong> — prestatorul de servicii de curățenie (PFA / PFI / SRL) înscris pe Platformă.</li>
+          <li><strong>Serviciu de lenjerie</strong> — prestatorul care preia, spală și returnează lenjeria.</li>
+          <li><strong>Solicitare</strong> — o comandă de servicii plasată prin Platformă.</li>
+        </ul>
+
+        <h2>3. Serviciile platformei</h2>
+        <p>Platforma facilitează intermedierea între Solicitanți și prestatori (Agenți Cleaning, Serviciu de lenjerie) pentru servicii de curățenie în regim hotelier. Operatorul nu prestează direct serviciile de curățenie, ci pune la dispoziție infrastructura de programare, plată și evaluare.</p>
+
+        <h2>4. Conturi și eligibilitate</h2>
+        <p>Pentru a folosi Platforma trebuie să creezi un cont cu date reale și complete. Prestatorii trebuie să fie entități legale (PFA / PFI / SRL) și să respecte legislația aplicabilă. Ești responsabil pentru confidențialitatea datelor de autentificare.</p>
+
+        <h2>5. Prețuri, plăți și rambursări</h2>
+        <ul>
+          <li>Prețul este afișat transparent înainte de plasarea solicitării și se achită în avans, securizat, prin procesatorul de plăți.</li>
+          <li>Operatorul reține un comision din valoarea fiecărei tranzacții, comunicat în platformă.</li>
+          <li><strong>Garanție:</strong> dacă lucrarea nu este efectuată în intervalul orar rezervat, Solicitantul primește rambursarea integrală pentru acea solicitare, plus compensația prevăzută în platformă.</li>
+        </ul>
+
+        <h2>6. Obligațiile utilizatorilor</h2>
+        <p>Solicitantul furnizează informații corecte despre locație (inclusiv suprafața) și accesul necesar. Prestatorii execută serviciile la standardul convenit, în intervalul rezervat, și respectă spațiile și bunurile din locație. Agenții Cleaning și Serviciile de lenjerie pot depune o garanție (cec) conform contractului propriu generat în platformă.</p>
+
+        <h2>7. Recenzii</h2>
+        <p>Recenziile trebuie să fie oneste și bazate pe experiența reală. Operatorul poate elimina recenziile abuzive, false sau care încalcă legea.</p>
+
+        <h2>8. Limitarea răspunderii</h2>
+        <p>Operatorul acționează ca intermediar și nu răspunde pentru calitatea intrinsecă a serviciilor prestate de terți, dincolo de mecanismele de garanție și evaluare oferite. Răspunderea Operatorului este limitată la valoarea comisionului aferent solicitării în cauză, în limitele permise de lege.</p>
+
+        <h2>9. Protecția datelor (GDPR)</h2>
+        <p>Prelucrăm datele personale conform Regulamentului (UE) 2016/679 (GDPR), doar în scopul funcționării Platformei. Ai dreptul de acces, rectificare, ștergere și portabilitate. Pentru solicitări privind datele tale, contactează Operatorul.</p>
+
+        <h2>10. Modificarea termenilor</h2>
+        <p>Operatorul poate actualiza acești termeni. Modificările intră în vigoare la publicarea pe această pagină. Utilizarea în continuare a Platformei constituie acceptarea termenilor actualizați.</p>
+
+        <h2>11. Contact</h2>
+        <p>Pentru întrebări privind acești termeni: telefon <a href="tel:${PHONE.replace(/\./g, "")}">${PHONE}</a>.</p>
+
+        <p><em>Acest document reprezintă un cadru general de utilizare. Pentru conformitate deplină cu specificul afacerii tale, recomandăm revizuirea de către un consultant juridic.</em></p>
+      </div>`
+    );
+  }
+
+  /* =========================================================
      LANDING EXECUTANȚI (recrutare)
      ========================================================= */
   function renderExecutantLanding() {
     topbar.hidden = true;
     document.body.classList.add("landing-active");
+    applyBasicSeo("Agenți Cleaning — câștigă din curățenie regim hotelier | " + SITE_NAME, "Ești firmă de curățenie (PFA/PFI/SRL)? Preia solicitări plătite în avans din zona ta, în regim hotelier. Clienții te aleg după rating. Înscrie-te la Sleep & Go Cleaning.", "/agenti-cleaning");
     app.innerHTML = "";
     const cleanPct = 100 - S.commissionPct();
     const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
@@ -3158,6 +3402,7 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
   function renderLaundryLanding() {
     topbar.hidden = true;
     document.body.classList.add("landing-active");
+    applyBasicSeo("Serviciu de lenjerie regim hotelier | " + SITE_NAME, "Spălătorie / serviciu de lenjerie: preia lenjeria din regim hotelier din zona ta, spal-o și returneaz-o. Venit constant, plată prin platformă. Înscrie-te la Sleep & Go Cleaning.", "/serviciu-lenjerie");
     app.innerHTML = "";
     const linenPct = 100 - S.commissionPct();
     const linenEurSet = money(S.ronToEur(C.linenSetPriceRon));
@@ -4219,6 +4464,13 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
   function blogEditModal(post) {
     const p = post || {};
     let cover = p.cover || "🧽";
+    const faq0 = Array.isArray(p.faq) ? p.faq : [];
+    const faqRow = (q, a) => `
+      <div class="faq-row" style="border:1px solid var(--line,#2b3648);border-radius:10px;padding:10px;margin-bottom:8px">
+        <input class="faqQ" value="${esc(q || "")}" placeholder="Întrebare (ex: Cât costă curățenia în regim hotelier?)" style="margin-bottom:6px" />
+        <textarea class="faqA" rows="2" placeholder="Răspuns scurt și clar — bun pentru Google și motoarele AI">${esc(a || "")}</textarea>
+        <div style="text-align:right;margin-top:4px"><button type="button" class="btn btn-sm faqDel" style="color:var(--err,#c33)">🗑️ Șterge</button></div>
+      </div>`;
     const box = modal(`
       <h3 style="margin:0 0 12px">${post ? "Editează articol" : "Articol nou"}</h3>
       <div class="field"><label>Titlu</label><input id="blTitle" value="${esc(p.title || "")}" placeholder="Titlul articolului" /></div>
@@ -4236,6 +4488,20 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         <textarea id="blBody" rows="12" placeholder="Scrie articolul aici.&#10;&#10;Rând gol = paragraf nou.&#10;## Subtitlu&#10;- element de listă">${esc(p.body || "")}</textarea>
         <p class="hint" style="color:var(--muted,#8aa);font-size:12px;margin-top:4px">Format simplu: rând gol = paragraf; „## " = subtitlu; „- " = listă.</p>
       </div>
+
+      <div style="border-top:1px solid var(--line,#2b3648);margin:16px 0 12px;padding-top:14px">
+        <strong>🔎 SEO / AEO / GEO</strong>
+        <p class="hint" style="color:var(--muted,#8aa);font-size:12px;margin:2px 0 12px">Cum apare articolul în Google și în motoarele AI (ChatGPT, Perplexity, Google AI). Dacă lași gol titlul SEO/meta, folosim automat titlul și rezumatul.</p>
+        <div class="field"><label>Titlu SEO <small style="color:var(--muted,#8aa)">(ideal 50–60 caractere)</small></label><input id="blSeoTitle" value="${esc(p.seoTitle || "")}" placeholder="Ex: Curățenie regim hotelier București — turnover Airbnb la timp" /></div>
+        <div class="field"><label>Meta descriere <small id="blMdCount" style="color:var(--muted,#8aa)"></small></label><textarea id="blMeta" rows="2" placeholder="Descrierea din rezultatele Google (ideal 150–160 caractere), cu cuvântul-cheie principal.">${esc(p.metaDescription || "")}</textarea></div>
+        <div class="field"><label>Cuvinte cheie <small style="color:var(--muted,#8aa)">(separate prin virgulă)</small></label><input id="blKw" value="${esc(p.keywords || "")}" placeholder="curățenie regim hotelier București, curățenie Airbnb, turnover check-out" /></div>
+        <div class="field">
+          <label>Întrebări frecvente (FAQ) <small style="color:var(--muted,#8aa)">— apar pe pagină și în datele structurate FAQPage (AEO)</small></label>
+          <div id="blFaq">${faq0.map(f => faqRow(f.q, f.a)).join("")}</div>
+          <button type="button" class="btn btn-soft btn-sm" id="blFaqAdd">➕ Adaugă întrebare</button>
+        </div>
+      </div>
+
       <label style="display:flex;align-items:center;gap:8px;margin:6px 0 14px"><input type="checkbox" id="blPub" ${p.published === false ? "" : "checked"}> Publicat (vizibil pe site)</label>
       <div class="btn-row">
         <button class="btn" id="blCancel">Anulează</button>
@@ -4254,16 +4520,33 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         prev.innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover">`;
       });
     };
+    // contor meta descriere
+    const md = box.querySelector("#blMeta"), mdc = box.querySelector("#blMdCount");
+    const updCount = () => { const n = md.value.length; mdc.textContent = n + " car." + (n >= 120 && n <= 160 ? " ✓" : ""); };
+    md.oninput = updCount; updCount();
+    // repetor FAQ
+    const faqWrap = box.querySelector("#blFaq");
+    const wireDel = () => faqWrap.querySelectorAll(".faqDel").forEach(b => b.onclick = () => b.closest(".faq-row").remove());
+    wireDel();
+    box.querySelector("#blFaqAdd").onclick = () => { faqWrap.insertAdjacentHTML("beforeend", faqRow("", "")); wireDel(); };
+
     box.querySelector("#blCancel").onclick = closeModal;
     box.querySelector("#blSave").onclick = async () => {
       const title = box.querySelector("#blTitle").value.trim();
       if (!title) return toast("Pune un titlu.", "err");
+      const faq = [...faqWrap.querySelectorAll(".faq-row")].map(r => ({
+        q: r.querySelector(".faqQ").value, a: r.querySelector(".faqA").value,
+      }));
       const data = {
         title,
         excerpt: box.querySelector("#blExcerpt").value,
         body: box.querySelector("#blBody").value,
         cover,
         published: box.querySelector("#blPub").checked,
+        seoTitle: box.querySelector("#blSeoTitle").value,
+        metaDescription: box.querySelector("#blMeta").value,
+        keywords: box.querySelector("#blKw").value,
+        faq,
       };
       if (post) S.updateBlogPost(post.id, data); else S.addBlogPost(data);
       await S.flush();
