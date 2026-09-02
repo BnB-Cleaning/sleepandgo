@@ -709,6 +709,36 @@ body.landing-active { background: var(--h-bg); }
 .zone-chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 880px; margin: 4px auto 0; }
 .zone-chip { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; border-radius: 999px; padding: 8px 15px; font-weight: 600; font-size: 14px; white-space: nowrap; }
 
+/* ===== Blog (home teaser + listă + articol) ===== */
+.blog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; max-width: 1100px; margin: 0 auto; }
+.blog-card { display: flex; flex-direction: column; background: #fff; border: 1px solid #e6ecf3; border-radius: 16px; overflow: hidden; text-decoration: none; color: var(--h-ink); transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; cursor: pointer; }
+.blog-card:hover { transform: translateY(-4px); box-shadow: 0 14px 34px rgba(20, 40, 80, .12); border-color: #bfdbfe; }
+.blog-cover { height: 150px; display: grid; place-items: center; font-size: 58px; background: linear-gradient(135deg, #eaf6fd, #e8eefb); }
+.blog-cover.img { background-size: cover; background-position: center; }
+.blog-cover.big { height: 300px; border-radius: 16px; font-size: 96px; margin: 8px 0 22px; }
+.bc-body { padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.bc-date { font-size: 12.5px; color: var(--h-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
+.blog-card h3 { margin: 0; font-family: 'Poppins', sans-serif; font-size: 18.5px; line-height: 1.3; color: var(--h-ink); }
+.bc-body p { margin: 0; color: var(--h-muted); font-size: 14.5px; line-height: 1.55; flex: 1; }
+.bc-more { color: var(--h-blue); font-weight: 700; font-size: 14px; margin-top: 4px; }
+.blog-hero { padding-bottom: 20px; }
+
+/* Pagina articol */
+.blog-article { padding: 36px 0 60px; }
+.blog-article .wrap { max-width: 760px; }
+.ba-back { display: inline-block; color: var(--h-blue); font-weight: 700; text-decoration: none; margin-bottom: 18px; cursor: pointer; }
+.ba-back:hover { text-decoration: underline; }
+.ba-date { font-size: 13.5px; color: var(--h-muted); font-weight: 600; }
+.blog-article h1 { font-family: 'Poppins', sans-serif; font-size: clamp(28px, 4vw, 40px); line-height: 1.15; margin: 8px 0 14px; color: var(--h-ink); }
+.ba-lead { font-size: 19px; line-height: 1.55; color: #33414f; font-weight: 500; margin: 0 0 24px; }
+.ba-body { font-size: 17px; line-height: 1.75; color: #2c3742; }
+.ba-body h2 { font-family: 'Poppins', sans-serif; font-size: 23px; line-height: 1.25; margin: 32px 0 12px; color: var(--h-ink); }
+.ba-body p { margin: 0 0 18px; }
+.ba-body ul { margin: 0 0 20px; padding-left: 22px; }
+.ba-body li { margin: 0 0 9px; line-height: 1.6; }
+.ba-foot { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 36px; padding-top: 26px; border-top: 1px solid #e6ecf3; }
+@media (max-width: 640px) { .blog-cover.big { height: 200px; font-size: 72px; } .ba-body { font-size: 16px; } }
+
 </style>
 
   <header class="topbar" id="topbar" hidden>
@@ -806,9 +836,89 @@ body.landing-active { background: var(--h-bg); }
     anulat: "Anulată",
   };
 
+  // Articole de start pentru blog — apar imediat, dar sunt complet editabile/ștergibile din admin.
+  function STARTER_BLOG() {
+    const day = 86400000;
+    return [
+      {
+        id: "blog_start1", slug: "curatenie-regim-hotelier-vs-clasica",
+        title: "Curățenia în regim hotelier nu e curățenie clasică. Iată de ce.",
+        excerpt: "Între check-out și check-in ai câteva ore ca locația să arate impecabil. Ce înseamnă asta concret și de ce contează pentru rating.",
+        cover: "🛏️",
+        author: "Sleep & Go Cleaning", published: true,
+        createdAt: Date.now() - 2 * day, updatedAt: Date.now() - 2 * day,
+        body:
+`În regim hotelier, curățenia nu e „o mătură și un mop". E un turnover complet, făcut într-o fereastră scurtă de timp, între plecarea unui oaspete și sosirea următorului.
+
+## Fereastra e scurtă, standardul e maxim
+La un apartament clasic ai timp. La o locație de închiriat pe termen scurt, ai adesea 3–4 ore între check-out (11:00) și check-in (15:00). În acel interval trebuie făcut tot: curățenie, schimbat lenjeria, reaprovizionat consumabilele, verificat că totul funcționează.
+
+## Ce intră într-un turnover corect
+- Curățenie completă: băi, bucătărie, praf, aspirat, pardoseli.
+- Schimbat integral lenjeria și prosoapele.
+- Reaprovizionat: hârtie igienică, apă, cafea, produse de bază.
+- Verificare finală: totul la locul lui, ca în anunțul de pe Booking/Airbnb.
+
+## De ce contează
+Primul lucru pe care îl vede oaspetele e curățenia. E factorul care apare cel mai des în recenziile negative — și cel care îți poate ridica sau prăbuși rating-ul. O locație curată, la timp, înseamnă recenzii mai bune, deci mai multe rezervări.
+
+Exact de asta Sleep & Go lucrează doar cu agenți verificați și cu un interval orar garantat: dacă nu e gata la timp, primești banii înapoi plus compensație.`,
+      },
+      {
+        id: "blog_start2", slug: "cum-functioneaza-circuitul-de-lenjerii",
+        title: "Cum funcționează circuitul de lenjerii Sleep & Go",
+        excerpt: "Fiecare set de lenjerie e etichetat individual și rotește continuu: în locație → la spălătorie → depozitat la agent → înapoi. Ca la fiecare check-in să existe lenjerie curată.",
+        cover: "🧺",
+        author: "Sleep & Go Cleaning", published: true,
+        createdAt: Date.now() - 1 * day, updatedAt: Date.now() - 1 * day,
+        body:
+`Una dintre cele mai mari bătăi de cap în regim hotelier e lenjeria: unde e, dacă e curată, dacă ajunge la timp pentru următorul oaspete. Am rezolvat asta cu un circuit clar.
+
+## Pasul 0: digitalizarea
+Primul pas al colaborării e etichetarea individuală a fiecărei lenjerii. Așa nu se încurcă niciodată cu a altcuiva și știm mereu exact unde se află fiecare set.
+
+## Circuitul
+Proprietarul introduce minim câteva seturi în circuit, care rotesc continuu:
+- În locație — pregătită pentru oaspete.
+- La spălătorie — după check-out, spălată și călcată.
+- Depozitată la Agentul Cleaning — gata pentru următoarea intervenție.
+- Înapoi în locație — la următorul check-in.
+
+## Rezultatul
+La fiecare check-in există mereu lenjerie curată pregătită, fără ca tu să te ocupi de nimic. Iar dacă nu vrei să investești în lenjerie proprie, o poți închiria direct de la noi.`,
+      },
+      {
+        id: "blog_start3", slug: "5-lucruri-care-iti-cresc-ratingul",
+        title: "5 lucruri care îți cresc rating-ul pe Airbnb și Booking",
+        excerpt: "Detalii mici, cu impact mare asupra recenziilor. De la curățenia băii până la consumabilele care fac diferența.",
+        cover: "⭐",
+        author: "Sleep & Go Cleaning", published: true,
+        createdAt: Date.now() - 6 * 3600000, updatedAt: Date.now() - 6 * 3600000,
+        body:
+`Rating-ul e moneda regimului hotelier. Iată cinci lucruri care fac diferența, în ordinea importanței.
+
+## 1. O baie impecabilă
+E primul loc pe care oaspetele îl inspectă. Fără urme, fără păr, fără miros. Un detaliu care apare constant în recenzii.
+
+## 2. Lenjerie curată și călcată
+Nu doar curată — și călcată. Diferența dintre „ok" și „wow" e adesea un cearșaf întins perfect.
+
+## 3. Consumabile de bază
+Hârtie igienică de rezervă, apă, cafea. Costă puțin, dar oaspeții le remarcă și le menționează.
+
+## 4. Punctualitate la check-in
+O locație care nu e gata la timp strică toată experiența. De aceea intervalul orar trebuie garantat.
+
+## 5. Consecvență
+Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie constantă, la fiecare rezervare. Aici ajută un sistem, nu norocul.`,
+      },
+    ];
+  }
+
   function seed() {
     return {
       settings: { commissionPct: CONFIG.commissionPct, ronPerEur: CONFIG.ronPerEur, pricePerSqm: CONFIG.pricePerSqm },
+      blog: STARTER_BLOG(),
       users: [
         { id: "u_admin", name: "Administrator", email: "admin@sleepandgo.com", password: "admin", role: "admin", area: null },
         {
@@ -1458,6 +1568,50 @@ body.landing-active { background: var(--h-bg); }
     },
 
     // ---- Solicitări ----
+    // ---- Blog (editabil din admin; fiecare articol are slug propriu → URL /blog/<slug>) ----
+    _slugify(s) {
+      return String(s || "").toLowerCase()
+        .replace(/ă|â/g, "a").replace(/î/g, "i").replace(/ș|ş/g, "s").replace(/ț|ţ/g, "t")
+        .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "articol";
+    },
+    _uniqueSlug(title, ignoreId) {
+      const base = this._slugify(title); let slug = base, i = 2;
+      const list = db.blog || [];
+      while (list.some(p => p.slug === slug && p.id !== ignoreId)) slug = base + "-" + (i++);
+      return slug;
+    },
+    // Injectează articolele de start dacă starea de pe server nu are încă blog.
+    _ensureBlog() { if (!Array.isArray(db.blog)) { db.blog = STARTER_BLOG(); save(db); } return db.blog; },
+    blogAll() { return this._ensureBlog().slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); },
+    blogPublished() { return this.blogAll().filter(p => p.published !== false); },
+    blogBySlug(slug) { return this._ensureBlog().find(p => p.slug === slug) || null; },
+    blogById(id) { return this._ensureBlog().find(p => p.id === id) || null; },
+    addBlogPost(data) {
+      this._ensureBlog();
+      const title = String(data.title || "").trim() || "Articol fără titlu";
+      const post = {
+        id: uid("blog"), slug: this._uniqueSlug(title), title,
+        excerpt: String(data.excerpt || "").trim(),
+        body: String(data.body || "").trim(),
+        cover: data.cover || "🧽",
+        author: String(data.author || "Sleep & Go Cleaning").trim(),
+        published: data.published !== false,
+        createdAt: Date.now(), updatedAt: Date.now(),
+      };
+      db.blog.push(post); save(db); return post;
+    },
+    updateBlogPost(id, data) {
+      const p = this.blogById(id); if (!p) return null;
+      if (data.title != null) { p.title = String(data.title).trim() || p.title; p.slug = this._uniqueSlug(p.title, id); }
+      if (data.excerpt != null) p.excerpt = String(data.excerpt).trim();
+      if (data.body != null) p.body = String(data.body).trim();
+      if (data.cover != null) p.cover = data.cover;
+      if (data.author != null) p.author = String(data.author).trim();
+      if (data.published != null) p.published = !!data.published;
+      p.updatedAt = Date.now(); save(db); return p;
+    },
+    deleteBlogPost(id) { this._ensureBlog(); db.blog = db.blog.filter(p => p.id !== id); save(db); },
+
     requests() { return db.requests.slice().sort((a, b) => b.createdAt - a.createdAt); },
     requestById(id) { return db.requests.find(r => r.id === id) || null; },
 
@@ -1867,21 +2021,30 @@ body.landing-active { background: var(--h-bg); }
   let regRole = "solicitant";
   let regBiz = "SRL";
   let landing = true;
-  let landingView = "home";  // "home" | "executant" | "spalatorie"
+  let landingView = "home";  // "home" | "executant" | "spalatorie" | "blog" | "article"
   let activeRole = null;     // panoul activ când utilizatorul are mai multe roluri
+  let currentArticleSlug = null;  // articolul deschis pe /blog/<slug>
 
   // Rutare pe URL: linkuri directe către fiecare landing (serverul servește index.html pe orice cale)
-  const LANDING_PATHS = { home: "/", executant: "/agenti-cleaning", spalatorie: "/serviciu-lenjerie" };
+  const LANDING_PATHS = { home: "/", executant: "/agenti-cleaning", spalatorie: "/serviciu-lenjerie", blog: "/blog" };
   function pathToView(p) {
     p = String(p || "/").replace(/\/+$/, "") || "/";
     if (p === "/agenti-cleaning" || p === "/agenti") return "executant";
     if (p === "/serviciu-lenjerie" || p === "/lenjerie") return "spalatorie";
+    if (p === "/blog") return "blog";
+    const m = p.match(/^\/blog\/(.+)$/);
+    if (m) { currentArticleSlug = decodeURIComponent(m[1]); return "article"; }
     return "home";
   }
+  function landingPath(v) {
+    if (v === "article" && currentArticleSlug) return "/blog/" + encodeURIComponent(currentArticleSlug);
+    return LANDING_PATHS[v] || "/";
+  }
   // schimbă landing-ul ȘI actualizează URL-ul, ca să poată fi copiat/distribuit
-  function setLandingView(v, push) {
+  function setLandingView(v, push, slug) {
+    if (typeof slug === "string") currentArticleSlug = slug;
     landingView = v;
-    const path = LANDING_PATHS[v] || "/";
+    const path = landingPath(v);
     try { if (push !== false && location.pathname !== path) history.pushState({ v }, "", path); } catch (e) {}
   }
 
@@ -2044,6 +2207,8 @@ body.landing-active { background: var(--h-bg); }
       if (!landing) return renderAuth();
       if (landingView === "executant") return renderExecutantLanding();
       if (landingView === "spalatorie") return renderLaundryLanding();
+      if (landingView === "blog") return renderBlogList();
+      if (landingView === "article") return renderBlogArticle();
       return renderHome();
     }
     document.body.classList.remove("landing-active");
@@ -2307,11 +2472,12 @@ body.landing-active { background: var(--h-bg); }
           </a>
           <nav class="h-nav">
             <a data-scroll="servicii">Servicii</a>
-            <a data-scroll="zone">Zone</a>
-            <a data-scroll="inchiriere">Închiriere lenjerii</a>
             <a data-scroll="preturi">Prețuri</a>
+            <a data-view="executant">Agenți Cleaning</a>
+            <a data-view="spalatorie">Serviciu lenjerie</a>
+            <a data-view="blog">Blog</a>
             <button class="h-btn ghost h-share" type="button" data-share>🔗 Distribuie</button>
-            <a class="h-btn primary h-cta" data-go="login">Intră în cont</a>
+            <a class="h-btn primary h-cta" data-go="login">Autentificare</a>
           </nav>
         </div></header>
 
@@ -2499,6 +2665,25 @@ body.landing-active { background: var(--h-bg); }
           <p class="hint" style="text-align:center;margin-top:20px;color:var(--h-muted)">⏰ Solicitările se trimit până la ora 20:00.</p>
         </div></section>
 
+        <!-- Blog -->
+        ${(() => {
+          const posts = S.blogPublished().slice(0, 3);
+          if (!posts.length) return "";
+          return `<section class="h-section soft" id="blog"><div class="wrap">
+            <div class="h-section-head">
+              <div class="eyebrow">Resurse</div>
+              <h2>De pe blog</h2>
+              <p>Ghiduri practice despre curățenie în regim hotelier, lenjerii și rating.</p>
+            </div>
+            <div class="blog-grid">
+              ${posts.map(blogCardHtml).join("")}
+            </div>
+            <div style="text-align:center;margin-top:24px">
+              <a class="h-btn ghost lg" data-view="blog">Vezi toate articolele →</a>
+            </div>
+          </div></section>`;
+        })()}
+
         <!-- CTA band -->
         <section class="h-section"><div class="wrap">
           <div class="h-cta-band">
@@ -2544,6 +2729,7 @@ body.landing-active { background: var(--h-bg); }
       goAuth(t);
     });
     app.querySelectorAll("[data-view]").forEach(a => a.onclick = () => { setLandingView(a.dataset.view); window.scrollTo(0, 0); renderApp(); });
+    app.querySelectorAll("[data-article]").forEach(a => a.onclick = () => openArticle(a.dataset.article));
     app.querySelectorAll("[data-share]").forEach(b => b.onclick = shareSite);
     app.querySelectorAll("[data-scroll]").forEach(a => a.onclick = () => {
       const target = document.getElementById(a.dataset.scroll);
@@ -2619,6 +2805,151 @@ body.landing-active { background: var(--h-bg); }
       toast("Cerere de ofertă trimisă! Te contactăm în curând.", "ok");
       f.reset();
     };
+  }
+
+  /* =========================================================
+     BLOG (public: listă + articol, cu URL propriu /blog/<slug>)
+     ========================================================= */
+  function blogDate(ts) {
+    try { return new Date(ts || Date.now()).toLocaleDateString("ro-RO", { day: "numeric", month: "long", year: "numeric" }); }
+    catch (e) { return ""; }
+  }
+  // cover: emoji (implicit) sau dataURL de imagine încărcată din admin
+  function blogCoverHtml(p, big) {
+    const c = (p && p.cover) || "🧽";
+    if (typeof c === "string" && c.startsWith("data:")) {
+      return `<div class="blog-cover img${big ? " big" : ""}" style="background-image:url('${c}')"></div>`;
+    }
+    return `<div class="blog-cover emoji${big ? " big" : ""}">${esc(c)}</div>`;
+  }
+  function blogCardHtml(p) {
+    return `<a class="blog-card" data-article="${esc(p.slug)}">
+      ${blogCoverHtml(p)}
+      <div class="bc-body">
+        <div class="bc-date">${blogDate(p.createdAt)}</div>
+        <h3>${esc(p.title)}</h3>
+        <p>${esc(p.excerpt || "")}</p>
+        <span class="bc-more">Citește →</span>
+      </div>
+    </a>`;
+  }
+  // corp articol: format simplu — paragrafe, „## " subtitlu, „- " listă
+  function blogBodyHtml(text) {
+    const blocks = String(text || "").split(/\n{2,}/);
+    let html = "", listOpen = false;
+    const closeList = () => { if (listOpen) { html += "</ul>"; listOpen = false; } };
+    for (const raw of blocks) {
+      const b = raw.trim(); if (!b) continue;
+      if (b.startsWith("## ")) { closeList(); html += `<h2>${esc(b.slice(3).trim())}</h2>`; continue; }
+      const lines = b.split(/\n/).map(l => l.trim()).filter(Boolean);
+      if (lines.length && lines.every(l => l.startsWith("- "))) {
+        closeList();
+        html += "<ul>" + lines.map(l => `<li>${esc(l.slice(2).trim())}</li>`).join("") + "</ul>";
+        continue;
+      }
+      closeList();
+      html += `<p>${esc(b).replace(/\n/g, "<br>")}</p>`;
+    }
+    closeList();
+    return html;
+  }
+  function openArticle(slug) { setLandingView("article", true, slug); window.scrollTo(0, 0); renderApp(); }
+
+  function blogChromeStart() {
+    return `
+      <div class="h-utility"><div class="wrap">
+        <a class="phone" href="tel:${PHONE.replace(/\./g, "")}">📞 SUNĂ: ${PHONE}</a>
+        <div class="u-right"><span>✓ Regim hotelier</span><span>✓ Plată în avans securizată</span></div>
+      </div></div>
+      <header class="h-header"><div class="wrap">
+        <a class="h-logo" data-home><span class="mark">🧽</span><span>Sleep &amp; Go<small>Cleaning</small></span></a>
+        <nav class="h-nav">
+          <a data-home>Acasă</a>
+          <a data-view="executant">Agenți Cleaning</a>
+          <a data-view="spalatorie">Serviciu lenjerie</a>
+          <a data-view="blog">Blog</a>
+          <button class="h-btn ghost h-share" type="button" data-share>🔗 Distribuie</button>
+          <a class="h-btn primary h-cta" data-go="login">Autentificare</a>
+        </nav>
+      </div></header>`;
+  }
+  function blogChromeEnd() {
+    return `<footer class="h-footer"><div class="wrap">
+      <div class="cols">
+        <div><div class="foot-logo"><span>🧽</span> Sleep &amp; Go Cleaning</div><p>Curățenie profesională în regim hotelier pentru închirieri pe termen scurt.</p><p>📞 ${PHONE}</p></div>
+        <div><h4>Platformă</h4><a data-home>Acasă</a><a data-view="executant">Agenți Cleaning</a><a data-view="spalatorie">Serviciu lenjerie</a><a data-view="blog">Blog</a></div>
+        <div><h4>Cont</h4><a data-go="login">Autentificare</a><a data-go="register">Creează cont</a></div>
+      </div>
+      <div class="copyright">© 2026 Sleep &amp; Go Cleaning. Toate drepturile rezervate.</div>
+    </div></footer>`;
+  }
+  function wireLandingLinks() {
+    app.querySelectorAll("[data-home]").forEach(a => a.onclick = () => { setLandingView("home"); window.scrollTo(0, 0); renderApp(); });
+    app.querySelectorAll("[data-view]").forEach(a => a.onclick = () => { setLandingView(a.dataset.view); window.scrollTo(0, 0); renderApp(); });
+    app.querySelectorAll("[data-article]").forEach(a => a.onclick = () => openArticle(a.dataset.article));
+    app.querySelectorAll("[data-go]").forEach(b => b.onclick = () => { const t = b.dataset.go; if (t === "top") { window.scrollTo({ top: 0, behavior: "smooth" }); return; } goAuth(t); });
+    app.querySelectorAll("[data-share]").forEach(b => b.onclick = shareSite);
+  }
+
+  function renderBlogList() {
+    topbar.hidden = true;
+    document.body.classList.add("landing-active");
+    app.innerHTML = "";
+    const posts = S.blogPublished();
+    try { document.title = "Blog — Sleep & Go Cleaning"; } catch (e) {}
+    app.appendChild(el(`
+      <div class="home">
+        ${blogChromeStart()}
+        <section class="h-hero blog-hero"><div class="wrap">
+          <div class="h-hero-text" style="max-width:760px">
+            <div class="eyebrow">Blog</div>
+            <h1>Resurse pentru <span class="accent">regim hotelier</span></h1>
+            <p class="lead">Ghiduri practice despre curățenie, lenjerii și cum să-ți crești rating-ul pe Airbnb și Booking.</p>
+          </div>
+        </div></section>
+        <section class="h-section"><div class="wrap">
+          ${posts.length
+            ? `<div class="blog-grid">${posts.map(blogCardHtml).join("")}</div>`
+            : `<p class="hint" style="text-align:center;color:var(--h-muted)">În curând publicăm primele articole.</p>`}
+        </div></section>
+        ${blogChromeEnd()}
+      </div>
+    `));
+    wireLandingLinks();
+  }
+
+  function renderBlogArticle() {
+    topbar.hidden = true;
+    document.body.classList.add("landing-active");
+    app.innerHTML = "";
+    const p = currentArticleSlug ? S.blogBySlug(currentArticleSlug) : null;
+    const visible = p && p.published !== false;
+    if (visible) { try { document.title = p.title + " — Sleep & Go Cleaning"; } catch (e) {} }
+    app.appendChild(el(`
+      <div class="home">
+        ${blogChromeStart()}
+        ${visible ? `
+        <article class="blog-article"><div class="wrap">
+          <a class="ba-back" data-view="blog">← Toate articolele</a>
+          ${blogCoverHtml(p, true)}
+          <div class="ba-date">${blogDate(p.createdAt)} · ${esc(p.author || "Sleep & Go Cleaning")}</div>
+          <h1>${esc(p.title)}</h1>
+          ${p.excerpt ? `<p class="ba-lead">${esc(p.excerpt)}</p>` : ""}
+          <div class="ba-body">${blogBodyHtml(p.body)}</div>
+          <div class="ba-foot">
+            <button class="h-btn ghost" type="button" data-share>🔗 Distribuie articolul</button>
+            <a class="h-btn primary" data-go="register">Începe cu Sleep &amp; Go</a>
+          </div>
+        </div></article>`
+        : `<section class="h-section"><div class="wrap" style="text-align:center">
+            <h1>Articolul nu a fost găsit</h1>
+            <p class="hint" style="color:var(--h-muted)">Poate a fost mutat sau șters.</p>
+            <a class="h-btn primary lg" data-view="blog" style="margin-top:16px">← Vezi toate articolele</a>
+          </div></section>`}
+        ${blogChromeEnd()}
+      </div>
+    `));
+    wireLandingLinks();
   }
 
   /* =========================================================
@@ -3828,6 +4159,7 @@ body.landing-active { background: var(--h-bg); }
         <button data-t="requests" class="${adminTab === "requests" ? "active" : ""}">🧾 Solicitări</button>
         <button data-t="time" class="${adminTab === "time" ? "active" : ""}">⏱️ Pontaj</button>
         <button data-t="users" class="${adminTab === "users" ? "active" : ""}">👥 Utilizatori${roleReqCount ? ` <span class="tab-alert">${roleReqCount}</span>` : ""}</button>
+        <button data-t="blog" class="${adminTab === "blog" ? "active" : ""}">📝 Blog</button>
       </div>
       <div id="admBody"></div>
     `));
@@ -3840,7 +4172,104 @@ body.landing-active { background: var(--h-bg); }
     else if (adminTab === "linen") renderAdminLinen(u);
     else if (adminTab === "requests") renderAdminRequests(u);
     else if (adminTab === "time") renderAdminTime();
+    else if (adminTab === "blog") renderAdminBlog(u);
     else renderAdminUsers();
+  }
+
+  /* ---- Admin: Blog (adaugă / editează / șterge articole) ---- */
+  function renderAdminBlog(u) {
+    const body = $("#admBody");
+    const posts = S.blogAll();
+    body.innerHTML = `
+      <div class="card" style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div>
+          <strong>Articole blog</strong>
+          <p class="hint" style="margin:2px 0 0;color:var(--muted,#8aa)">Apar public la <code>/blog</code>. Fiecare articol are pagina lui: <code>/blog/&lt;titlu&gt;</code>.</p>
+        </div>
+        <button class="btn" id="blogAdd">➕ Articol nou</button>
+      </div>
+      ${posts.length ? `<div style="display:flex;flex-direction:column;gap:10px">${posts.map(p => `
+        <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="font-size:26px;line-height:1;width:40px;text-align:center">${typeof p.cover === "string" && p.cover.startsWith("data:") ? "🖼️" : esc(p.cover || "🧽")}</div>
+          <div style="flex:1;min-width:200px">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <strong>${esc(p.title)}</strong>
+              ${p.published !== false ? `<span class="badge ok" style="font-size:11px">Publicat</span>` : `<span class="badge" style="font-size:11px;background:#eab;color:#633">Ciornă</span>`}
+            </div>
+            <div class="hint" style="color:var(--muted,#8aa);font-size:12px">${blogDate(p.createdAt)} · /blog/${esc(p.slug)}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-soft btn-sm" data-blogview="${esc(p.slug)}">👁️ Vezi</button>
+            <button class="btn btn-soft btn-sm" data-blogedit="${esc(p.id)}">✏️ Editează</button>
+            <button class="btn btn-sm" data-blogdel="${esc(p.id)}" style="color:var(--err,#c33)">🗑️</button>
+          </div>
+        </div>`).join("")}</div>`
+        : `<p class="hint" style="color:var(--muted,#8aa)">Niciun articol încă. Apasă „Articol nou".</p>`}
+    `;
+    $("#blogAdd").onclick = () => blogEditModal(null);
+    body.querySelectorAll("[data-blogedit]").forEach(b => b.onclick = () => blogEditModal(S.blogById(b.dataset.blogedit)));
+    body.querySelectorAll("[data-blogview]").forEach(b => b.onclick = () => openArticle(b.dataset.blogview));
+    body.querySelectorAll("[data-blogdel]").forEach(b => b.onclick = async () => {
+      const p = S.blogById(b.dataset.blogdel); if (!p) return;
+      if (!confirm(`Ștergi articolul „${p.title}"? Acțiunea nu se poate anula.`)) return;
+      S.deleteBlogPost(p.id); await S.flush(); toast("Articol șters.", "ok"); renderAdmin(u);
+    });
+  }
+
+  function blogEditModal(post) {
+    const p = post || {};
+    let cover = p.cover || "🧽";
+    const box = modal(`
+      <h3 style="margin:0 0 12px">${post ? "Editează articol" : "Articol nou"}</h3>
+      <div class="field"><label>Titlu</label><input id="blTitle" value="${esc(p.title || "")}" placeholder="Titlul articolului" /></div>
+      <div class="field"><label>Rezumat scurt (apare pe card)</label><textarea id="blExcerpt" rows="2" placeholder="1–2 fraze care rezumă articolul">${esc(p.excerpt || "")}</textarea></div>
+      <div class="field">
+        <label>Imagine / emoji de copertă</label>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span id="blCoverPrev" style="width:56px;height:56px;border-radius:10px;display:grid;place-items:center;font-size:30px;background:#f1f5f9;overflow:hidden">${cover.startsWith("data:") ? `<img src="${cover}" style="width:100%;height:100%;object-fit:cover">` : esc(cover)}</span>
+          <input id="blEmoji" value="${cover.startsWith("data:") ? "" : esc(cover)}" placeholder="Emoji (ex: 🧽)" style="width:120px" />
+          <label class="btn btn-soft btn-sm" style="cursor:pointer">🖼️ Încarcă imagine<input type="file" id="blImg" accept="image/*" hidden></label>
+        </div>
+        <p class="hint" style="color:var(--muted,#8aa);font-size:12px;margin-top:4px">Lasă emoji sau încarcă o poză (max 15 MB, se redimensionează automat).</p>
+      </div>
+      <div class="field"><label>Conținut</label>
+        <textarea id="blBody" rows="12" placeholder="Scrie articolul aici.&#10;&#10;Rând gol = paragraf nou.&#10;## Subtitlu&#10;- element de listă">${esc(p.body || "")}</textarea>
+        <p class="hint" style="color:var(--muted,#8aa);font-size:12px;margin-top:4px">Format simplu: rând gol = paragraf; „## " = subtitlu; „- " = listă.</p>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;margin:6px 0 14px"><input type="checkbox" id="blPub" ${p.published === false ? "" : "checked"}> Publicat (vizibil pe site)</label>
+      <div class="btn-row">
+        <button class="btn" id="blCancel">Anulează</button>
+        <button class="btn" id="blSave">${post ? "Salvează" : "Publică"}</button>
+      </div>
+    `);
+    const prev = box.querySelector("#blCoverPrev");
+    const emojiInp = box.querySelector("#blEmoji");
+    emojiInp.oninput = () => { if (emojiInp.value.trim()) { cover = emojiInp.value.trim(); prev.innerHTML = esc(cover); } };
+    box.querySelector("#blImg").onchange = (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      readDocFile(f, (res) => {
+        const dataUrl = res && res.dataUrl;
+        if (!dataUrl) return;
+        cover = dataUrl; emojiInp.value = "";
+        prev.innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover">`;
+      });
+    };
+    box.querySelector("#blCancel").onclick = closeModal;
+    box.querySelector("#blSave").onclick = async () => {
+      const title = box.querySelector("#blTitle").value.trim();
+      if (!title) return toast("Pune un titlu.", "err");
+      const data = {
+        title,
+        excerpt: box.querySelector("#blExcerpt").value,
+        body: box.querySelector("#blBody").value,
+        cover,
+        published: box.querySelector("#blPub").checked,
+      };
+      if (post) S.updateBlogPost(post.id, data); else S.addBlogPost(data);
+      await S.flush();
+      closeModal(); toast(post ? "Articol salvat." : "Articol publicat.", "ok");
+      renderAdmin(S.currentUser());
+    };
   }
 
   // Pontaj (admin): timpii de lucru ai tuturor Agenților Cleaning
