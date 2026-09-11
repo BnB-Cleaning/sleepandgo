@@ -555,11 +555,11 @@ const app = express();
 // marchează o solicitare ca plătită (idempotent) — folosit de webhook și de /verify
 const VIP = { baseRon: 100, extraRon: 50, discountPct: 10, periodDays: 30 };
 function vipMonthlyRon(locations) { return VIP.baseRon + VIP.extraRon * (Math.max(1, Number(locations) || 1) - 1); }
-async function activateVipServer(userId, locationIdsCsv, sessionId) {
-  const st = await getState();
+function setVipOnState(st, userId, locationIdsCsv, sessionId) {
   const u = (st.users || []).find(x => x.id === userId);
   if (!u) return false;
-  let ids = String(locationIdsCsv || "").split(",").map(s => s.trim()).filter(Boolean);
+  let ids = Array.isArray(locationIdsCsv) ? locationIdsCsv.slice()
+    : String(locationIdsCsv || "").split(",").map(s => s.trim()).filter(Boolean);
   if (!ids.length) ids = (st.locations || []).filter(l => l.ownerId === userId && l.status === "approved").map(l => l.id);
   ids = [...new Set(ids)];
   const loc = Math.max(1, ids.length);
@@ -567,8 +567,13 @@ async function activateVipServer(userId, locationIdsCsv, sessionId) {
   const prevUntil = (u.vip && u.vip.until && u.vip.until > now) ? u.vip.until : now;
   u.vip = { active: true, since: (u.vip && u.vip.since) || now, until: prevUntil + VIP.periodDays * 86400000, locationIds: ids, locations: loc, monthlyRon: vipMonthlyRon(loc), lastPaymentAt: now };
   if (sessionId) u.vip.stripeSessionId = sessionId;
+  return true;
+}
+async function activateVipServer(userId, locationIdsCsv, sessionId) {
+  const st = await getState();
+  if (!setVipOnState(st, userId, locationIdsCsv, sessionId)) return false;
   await saveState(st);
-  console.log("[stripe] VIP activat:", userId, "·", loc, "locații");
+  console.log("[stripe] VIP activat:", userId);
   return true;
 }
 async function markRequestPaid(reqId, sessionId) {
@@ -823,6 +828,27 @@ app.post("/api/pay/vip/checkout", async (req, res) => {
       cancel_url: origin + "/?vipcancel=1",
     });
     res.json({ ok: true, url: session.url });
+  } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
+});
+
+// --- Admin: activează / revocă manual abonamentul VIP (marchează plătit fără Stripe) ---
+app.post("/api/vip/admin-set", async (req, res) => {
+  try {
+    const uid = readSession(req);
+    const st = await getState();
+    const me = (st.users || []).find(u => u.id === uid);
+    if (!me || me.role !== "admin") return res.status(403).json({ ok: false, error: "Doar administratorul." });
+    const b = req.body || {};
+    const target = (st.users || []).find(u => u.id === b.userId);
+    if (!target) return res.status(404).json({ ok: false, error: "Cont inexistent." });
+    if (b.active === false) {
+      if (target.vip) target.vip.active = false;
+    } else {
+      if (!setVipOnState(st, b.userId, b.locationIds)) return res.status(400).json({ ok: false, error: "Nu s-a putut activa." });
+      target.vip.grantedByAdmin = true;
+    }
+    await saveState(st);
+    res.json({ ok: true, vip: target.vip || null });
   } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 

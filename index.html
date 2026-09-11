@@ -1973,6 +1973,23 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       catch (e) { return { ok: false, error: String(e.message || e) }; }
     },
     vipMembers() { return (db.users || []).filter(u => u.vip && u.vip.active).map(u => ({ id: u.id, name: u.name, email: u.email, ...this.vipInfo(u) })); },
+    // admin: activează (marchează plătit) / revocă VIP pentru un cont, fără Stripe
+    async adminSetVip(userId, active, locationIds) {
+      if (MODE === "api") {
+        let r; try { r = await apiPOST("/api/vip/admin-set", { userId, active, locationIds }); } catch (e) { return { ok: false, error: "Eroare de rețea." }; }
+        if (r && r.ok) { try { await refreshState(); } catch (e) {} }
+        return r || { ok: false };
+      }
+      const u = this.userById(userId); if (!u) return { ok: false, error: "Cont inexistent." };
+      if (active === false) { if (u.vip) u.vip.active = false; save(db); return { ok: true }; }
+      const c = CONFIG.vip;
+      let ids = Array.isArray(locationIds) && locationIds.length ? locationIds : this.approvedLocationsOfOwner(userId).map(l => l.id);
+      ids = [...new Set(ids)];
+      const now = Date.now();
+      const prevUntil = (u.vip && u.vip.until && u.vip.until > now) ? u.vip.until : now;
+      u.vip = { active: true, since: (u.vip && u.vip.since) || now, until: prevUntil + c.periodDays * 86400000, locationIds: ids, locations: ids.length, monthlyRon: this.vipMonthlyRon(Math.max(1, ids.length)), grantedByAdmin: true };
+      save(db); return { ok: true };
+    },
 
     // ---- Consumabile (catalog gestionat de admin) ----
     products() { return (db.products || []).slice(); },
@@ -5999,6 +6016,17 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
           <div class="nc total"><span class="nc-n">${monthlyTotalRon} lei</span><span class="nc-l">venit lunar VIP</span></div>
         </div>
       </div>
+      <div class="card" style="margin-bottom:14px">
+        <strong>Activează VIP pentru un client (marchează plătit)</strong>
+        <p class="hint" style="margin:4px 0 10px;color:${muted}">Activare manuală, fără Stripe — pentru clienți plătiți în alt mod sau conturi de test. Se înscriu toate locațiile aprobate ale clientului.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <select id="vipGrantUser" style="min-width:240px">
+            <option value="">— alege un client —</option>
+            ${S.solicitants().filter(x => !S.isVipActive(x)).map(x => `<option value="${esc(x.id)}">${esc(x.name)} · ${esc(x.email)}</option>`).join("")}
+          </select>
+          <button class="btn" id="vipGrantBtn">👑 Activează VIP</button>
+        </div>
+      </div>
       <div class="card">
         <strong>Listă membri</strong>
         <div style="margin-top:10px">${members.length ? `<div class="subs-table">${members.map(m => {
@@ -6008,10 +6036,24 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
               <div class="hint" style="color:${muted};margin-top:2px">${m.locations} ${m.locations === 1 ? "locație" : "locații"} · ${m.monthlyRon} lei/lună · valabil până ${until} (${m.daysLeft} zile)</div>
             </div>
             <div class="sr-meta"><span class="badge ok">👑 VIP activ</span></div>
+            <button class="btn btn-sm vipRevoke" data-id="${esc(m.id)}" style="color:var(--err,#c33)">Revocă</button>
           </div>`;
         }).join("")}</div>` : `<p class="hint" style="color:${muted}">Niciun membru VIP încă.</p>`}</div>
       </div>
     `;
+    const grantBtn = $("#vipGrantBtn");
+    if (grantBtn) grantBtn.onclick = async () => {
+      const id = $("#vipGrantUser").value; if (!id) return toast("Alege un client.", "err");
+      grantBtn.disabled = true;
+      const res = await S.adminSetVip(id, true);
+      grantBtn.disabled = false;
+      if (res && res.ok) { toast("VIP activat pentru client. 👑", "ok"); renderAdmin(u); } else toast((res && res.error) || "Eroare.", "err");
+    };
+    body.querySelectorAll(".vipRevoke").forEach(b => b.onclick = async () => {
+      if (!confirm("Revoci abonamentul VIP pentru acest client?")) return;
+      const res = await S.adminSetVip(b.dataset.id, false);
+      if (res && res.ok) { toast("VIP revocat.", "ok"); renderAdmin(u); } else toast((res && res.error) || "Eroare.", "err");
+    });
   }
 
   function blogEditModal(post) {
