@@ -792,6 +792,18 @@ body.landing-active { background: var(--h-bg); }
 .mode-price { display: inline-block; font-weight: 800; font-size: 16px; color: var(--h-blue); background: #eaf6fd; border-radius: 999px; padding: 5px 14px; margin-bottom: 12px; }
 .mode-card p { margin: 0; color: #33414f; font-size: 14.5px; line-height: 1.6; }
 
+/* ===== Notificări email + SMS (home) ===== */
+.notif-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 22px; max-width: 860px; margin: 0 auto; }
+.notif-card { background: #fff; border: 1px solid #e6ecf3; border-radius: 18px; padding: 26px 24px; text-align: center; box-shadow: 0 8px 24px rgba(20, 40, 80, .06); }
+.notif-ico { font-size: 40px; line-height: 1; }
+.notif-card h3 { font-family: 'Poppins', sans-serif; font-size: 19px; margin: 12px 0 8px; color: var(--h-ink); }
+.notif-card p { margin: 0; color: #33414f; font-size: 14.5px; line-height: 1.6; }
+.notif-card .notif-chan { display: inline-block; margin-top: 12px; font-weight: 700; font-size: 13px; color: var(--h-blue); background: #eaf6fd; border-radius: 999px; padding: 5px 14px; }
+
+/* ===== Controale video (înainte/după) în cardul lucrării ===== */
+.vid-ctrl { display: inline-flex; gap: 6px; align-items: center; }
+.btn.btn-sm { padding: 6px 12px; font-size: 13px; }
+
 </style>
 
   <header class="topbar" id="topbar" hidden>
@@ -1893,6 +1905,31 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       }
       return { ok: true, ...this._applyRefund(r) };
     },
+
+    // ---- Video înainte/după (dovadă pentru despăgubiri) ----
+    _vidField(kind) { return kind === "after" ? "videoAfter" : "videoBefore"; },
+    hasVideo(req, kind) { return !!(req && req[this._vidField(kind)]); },
+    // URL/sursă pentru redare: pe server = endpoint; local (demo) = data URL stocat pe solicitare
+    videoUrl(reqId, kind) {
+      if (MODE === "api") return "/api/video/" + encodeURIComponent(reqId) + "/" + kind;
+      const r = this.requestById(reqId); const v = r && r[this._vidField(kind)];
+      return (v && v.dataUrl) ? v.dataUrl : null;
+    },
+    async uploadVideo(reqId, kind, dataUrl) {
+      if (kind !== "before" && kind !== "after") return { ok: false, error: "Tip invalid." };
+      if (MODE === "api") {
+        let resp;
+        try { resp = await apiPOST("/api/video/" + encodeURIComponent(reqId) + "/" + kind, { dataUrl }); }
+        catch (e) { return { ok: false, error: "Eroare de rețea la încărcarea video." }; }
+        if (!resp || !resp.ok) return { ok: false, error: (resp && resp.error) || "Încărcarea a eșuat." };
+        try { await refreshState(); } catch (e) {}
+        return { ok: true };
+      }
+      // local/demo: stochează pe solicitare (doar pentru testare)
+      const r = this.requestById(reqId); if (!r) return { ok: false, error: "Solicitare inexistentă." };
+      r[this._vidField(kind)] = { at: Date.now(), by: db.session, dataUrl };
+      save(db); return { ok: true };
+    },
     // Agentul Cleaning PORNEȘTE lucrul → status în progres + pontaj (ora de început)
     startWork(id, executorId) {
       const r = this.requestById(id);
@@ -2818,8 +2855,30 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
           </div>
         </div></section>
 
+        <!-- Notificări status -->
+        <section class="h-section soft"><div class="wrap">
+          <div class="h-section-head">
+            <div class="eyebrow">📲 Mereu la curent</div>
+            <h2>Notificări prin email și SMS</h2>
+            <p>Nu stai cu ochii pe telefon — te ținem la curent cu statusul operațiunii, la fiecare pas.</p>
+          </div>
+          <div class="notif-grid">
+            <div class="notif-card">
+              <div class="notif-ico">▶️</div>
+              <h3>Când începe activitatea</h3>
+              <p>Primești <strong>email</strong> și <strong>SMS</strong> în momentul în care Agentul Cleaning începe lucrul la locația ta.</p>
+            </div>
+            <div class="notif-card">
+              <div class="notif-ico">✅</div>
+              <h3>Când se termină activitatea</h3>
+              <p>Ești anunțat prin <strong>email</strong> și <strong>SMS</strong> imediat ce locația e gata pentru oaspeți.</p>
+            </div>
+          </div>
+          <p class="hint" style="text-align:center;margin-top:20px;color:var(--h-muted)">📧 Email + 📱 SMS cu statusul curățeniei — știi mereu exact în ce stadiu e lucrarea.</p>
+        </div></section>
+
         <!-- Servicii -->
-        <section class="h-section soft" id="servicii"><div class="wrap">
+        <section class="h-section" id="servicii"><div class="wrap">
           <div class="h-section-head">
             <div class="eyebrow">🧴 Ce oferim</div>
             <h2>Servicii pentru regim hotelier</h2>
@@ -5528,6 +5587,34 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     };
   }
 
+  /* ---------- Video înainte/după (dovadă despăgubiri) ---------- */
+  function readVideoFile(file, cb) {
+    if (!file) return cb(null);
+    if (!/^video\//.test(file.type || "")) { toast("Alege un fișier video.", "err"); return; }
+    const MAX = 15 * 1024 * 1024;   // ~20–30s clip de telefon
+    if (file.size > MAX) { toast("Video prea mare (max 15 MB). Filmează mai scurt (~20–30s).", "err"); return; }
+    const reader = new FileReader();
+    reader.onload = () => cb(reader.result);
+    reader.onerror = () => toast("Nu s-a putut citi video-ul.", "err");
+    reader.readAsDataURL(file);
+  }
+  function videoModal(url, title) {
+    modal(`<h3 style="margin:0 0 10px">${esc(title || "Video")}</h3>
+      <video src="${url}" controls playsinline style="width:100%;max-height:70vh;border-radius:10px;background:#000"></video>
+      <div class="btn-row" style="margin-top:12px"><button class="btn btn-soft btn-block" onclick="_closeModal()">Închide</button></div>`);
+  }
+  // controale pentru Agentul Cleaning: filmează direct (mobil) sau încarcă un video
+  function videoControls(r, kind) {
+    const label = kind === "before" ? "înainte" : "după";
+    const has = S.hasVideo(r, kind);
+    const inputId = `vid_${kind}_${r.id}`;
+    return `<span class="vid-ctrl">
+      <input type="file" accept="video/*" capture="environment" id="${inputId}" data-vidreq="${r.id}" data-vidkind="${kind}" hidden>
+      <button class="btn btn-soft btn-sm" data-vidbtn="${inputId}">🎥 Video ${label}${has ? " · reîncarcă ↻" : " (filmează/încarcă)"}</button>
+      ${has ? `<button class="btn btn-soft btn-sm" data-vidview="${kind}">▶️ vezi</button>` : ""}
+    </span>`;
+  }
+
   /* =========================================================
      CARD SOLICITARE (reutilizabil)
      ========================================================= */
@@ -5636,6 +5723,9 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         } else if (r.refundable) {
           parts.push(`<span class="pill">🔓 Rambursabil${S.canRefund(r).reason === "deadline" ? " · termen expirat" : ""}</span>`);
         }
+        // video de la Agentul Cleaning (dacă există) — pentru dovadă / despăgubiri
+        if (S.hasVideo(r, "before")) parts.push(`<button class="btn btn-soft btn-sm" data-vidview="before">🎥 Video înainte</button>`);
+        if (S.hasVideo(r, "after")) parts.push(`<button class="btn btn-soft btn-sm" data-vidview="after">🎥 Video după</button>`);
         actions = parts.join("");
       }
     } else if (isExec) {
@@ -5649,6 +5739,13 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         if (r.status === S.STATUS.ACCEPTAT) acts.push(`<button class="btn btn-sm" data-act="start">Începe lucrul</button>`);
         else if (r.status === S.STATUS.IN_PROGRES) acts.push(`<button class="btn btn-ok btn-sm" data-act="ready">🔔 Anunță: locația e gata pentru oaspeți</button>`);
         else if (r.status === S.STATUS.FINALIZAT) acts.push(`<span class="pill">✅ Locația e gata · client anunțat</span>`);
+
+        // Video înainte/după — dovadă pentru despăgubiri (filmează direct de pe telefon sau încarcă)
+        if (r.status !== S.STATUS.ANULAT) {
+          acts.push(videoControls(r, "before"));
+          acts.push(videoControls(r, "after"));
+          acts.push(`<span class="hint" style="flex-basis:100%;font-size:12px;color:var(--muted,#8aa)">🎥 Video înainte/după — necesar pentru <strong>despăgubiri</strong> (Airbnb/Booking). Îl faci la <strong>cererea solicitantului</strong> sau dacă la sosire locația e <strong>foarte murdară</strong>.</span>`);
+        }
 
         // decizia pentru lenjerie — independentă de finalizarea curățeniei:
         // rămâne disponibilă până când lenjeria e preluată sau refuzată (chiar și după «gata»)
@@ -5674,7 +5771,9 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     } else if (ctx === "admin") {
       actions = `<span class="pill">Solicitant: ${esc(requester ? requester.name : "?")}</span>
         ${cleaner ? `<span class="pill">🧹 ${esc(cleaner.name)}</span>` : ""}
-        ${linenExec ? `<span class="pill">🧺 ${esc(linenExec.name)}</span>` : ""}`;
+        ${linenExec ? `<span class="pill">🧺 ${esc(linenExec.name)}</span>` : ""}
+        ${S.hasVideo(r, "before") ? `<button class="btn btn-soft btn-sm" data-vidview="before">🎥 Video înainte</button>` : ""}
+        ${S.hasVideo(r, "after") ? `<button class="btn btn-soft btn-sm" data-vidview="after">🎥 Video după</button>` : ""}`;
     }
 
     // adresa completă apare doar după ce Agentul Cleaning preia (curățenie sau lenjerie)
@@ -5766,6 +5865,28 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       const res = S.chooseExecutor(r.id, btn.dataset.choose);
       if (res.ok) { const ex = S.userById(btn.dataset.choose); toast("L-ai ales pe " + (ex ? ex.name : "Agent Cleaning") + "!", "ok"); renderApp(); }
       else toast(res.error || "Nu s-a putut alege Agentul Cleaning.", "err");
+    });
+    card.querySelectorAll("[data-vidbtn]").forEach(b => b.onclick = () => {
+      const inp = card.querySelector("#" + b.dataset.vidbtn);
+      if (inp) inp.click();
+    });
+    card.querySelectorAll('input[type="file"][data-vidkind]').forEach(inp => inp.onchange = (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      readVideoFile(f, async (dataUrl) => {
+        if (!dataUrl) return;
+        toast("Se încarcă video-ul…", "");
+        const res = await S.uploadVideo(inp.dataset.vidreq, inp.dataset.vidkind, dataUrl);
+        if (res && res.ok) { toast("Video încărcat.", "ok"); renderApp(); }
+        else toast((res && res.error) || "Încărcarea a eșuat.", "err");
+      });
+      e.target.value = "";
+    });
+    card.querySelectorAll("[data-vidview]").forEach(b => b.onclick = () => {
+      const k = b.dataset.vidview;
+      const url = S.videoUrl(r.id, k);
+      if (!url) { toast("Video indisponibil.", "err"); return; }
+      videoModal(url, "Video " + (k === "before" ? "înainte" : "după"));
     });
     return card;
   }

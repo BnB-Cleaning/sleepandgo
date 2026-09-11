@@ -270,6 +270,42 @@ app.post("/api/pay/webhook", express.raw({ type: "application/json" }), async (r
   res.json({ received: true });
 });
 
+// --- Video-uri înainte/după (dovadă pentru despăgubiri) ---
+// Stocate SEPARAT de starea principală (chei kv „vid:<reqId>:<kind>"), ca să nu îngreuneze state-ul.
+// Servite ca fișier video direct, pentru <video src=...>. Upload cu limită proprie de corp.
+app.get("/api/video/:reqId/:kind", async (req, res) => {
+  try {
+    const v = await store.get("vid:" + req.params.reqId + ":" + req.params.kind);
+    if (!v) return res.status(404).end();
+    const m = /^data:([^;]+);base64,(.*)$/.exec(v);
+    if (!m) return res.status(404).end();
+    res.setHeader("Content-Type", m[1]);
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    res.send(Buffer.from(m[2], "base64"));
+  } catch (e) { res.status(500).end(); }
+});
+app.post("/api/video/:reqId/:kind", express.json({ limit: "35mb" }), async (req, res) => {
+  try {
+    const uid = readSession(req);
+    if (!uid) return res.status(401).json({ ok: false, error: "Neautentificat." });
+    const { reqId, kind } = req.params;
+    if (kind !== "before" && kind !== "after") return res.status(400).json({ ok: false, error: "Tip invalid." });
+    const dataUrl = req.body && req.body.dataUrl;
+    if (!dataUrl || typeof dataUrl !== "string" || !/^data:video\//.test(dataUrl))
+      return res.status(400).json({ ok: false, error: "Video invalid." });
+    const st = await getState();
+    const r = (st.requests || []).find(x => x.id === reqId);
+    if (!r) return res.status(404).json({ ok: false, error: "Solicitare inexistentă." });
+    const me = (st.users || []).find(u => u.id === uid);
+    const isAdmin = me && me.role === "admin";
+    if (r.executorId !== uid && !isAdmin) return res.status(403).json({ ok: false, error: "Nu ești Agentul Cleaning al acestei lucrări." });
+    await store.set("vid:" + reqId + ":" + kind, dataUrl);
+    r[kind === "after" ? "videoAfter" : "videoBefore"] = { at: Date.now(), by: uid };
+    await saveState(st);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
+});
+
 app.use(express.json({ limit: "25mb" }));
 
 // --- Auth ---
