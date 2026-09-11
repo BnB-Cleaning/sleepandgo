@@ -3553,6 +3553,12 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
                   ${S.activeProducts().map(p => `<label class="sim-cons-row"><span>${esc(p.name)} <small>(${p.priceRon} lei)</small></span><input type="number" class="exCons" data-pid="${p.id}" data-def="${p.id === "p_hartie" ? 2 : 0}" min="0" value="${p.id === "p_hartie" ? 2 : 0}" autocomplete="off" /></label>`).join("")}
                 </div>
               </div>
+              <div class="rf-field"><label>Opțiuni alese de client</label>
+                <div class="sim-opts">
+                  <label class="sim-opt"><input type="checkbox" id="exUrgent" /> ⚡ Urgență <small>(+${C.urgentSurchargePct}%)</small></label>
+                  <label class="sim-opt"><input type="checkbox" id="exRefundable" /> 🔓 Rambursabil <small>(+${C.refundableSurchargePct}%)</small></label>
+                </div>
+              </div>
               <div id="exBreakdown" class="sim-breakdown"></div>
               <div class="sim-total-row"><span>Tu primești</span><span id="exTotal" class="sim-total">€0.00</span></div>
               <p class="hint" id="exNote" style="color:var(--h-muted);margin:6px 0 0"></p>
@@ -3668,6 +3674,8 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         linens, linenExecutorId: linens ? "sim" : null,
         linenSets: $("#exSets") ? $("#exSets").value : 0,
         consumables: exReadCons(),
+        urgent: !!($("#exUrgent") && $("#exUrgent").checked),
+        refundable: !!($("#exRefundable") && $("#exRefundable").checked),
       };
     };
     function exRecalc() {
@@ -3678,6 +3686,7 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         sqm: Number(d.sqm) || 0, startTime: d.startTime, date: d.date,
         linens: d.linens, linenExecutorId: d.linenExecutorId,
         linenSets: Number(d.linenSets) || 0, consumables: d.consumables,
+        urgent: d.urgent, refundable: d.refundable,
       });
       const commissionCleaning = b.cleaningNet - b.cleaningPayout;
       const rows = [];
@@ -3689,15 +3698,26 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       if (b.linenTaken && b.linenSets > 0) rows.push(`<div class="sb-row"><span>+ 🧺 Lenjerie preluată (${b.linenSets} × ${C.linenSetPriceRon} lei · ${cleanPct}%)</span><span>+${money(b.linenPayout)}</span></div>`);
       // Sursa 3 — Consumabile (partea ta din adaos)
       if (b.consExecutantPayout > 0) rows.push(`<div class="sb-row"><span>+ 🧴 Consumabile (${C.consumableSplit.executant}% din adaos)</span><span>+${money(b.consExecutantPayout)}</span></div>`);
+      // Opțiunile clientului — clientul plătește în plus, dar surplusul merge la PLATFORMĂ (nu la agent)
+      if (b.urgentAdd) rows.push(`<div class="sb-row" style="color:var(--h-muted)"><span>⚡ Urgență — client plătește +${money(b.urgentAdd)} <small>→ platformă</small></span><span>+€0.00</span></div>`);
+      if (b.refundableAdd) rows.push(`<div class="sb-row" style="color:var(--h-muted)"><span>🔓 Rambursabil — client plătește +${money(b.refundableAdd)} <small>→ platformă</small></span><span>+€0.00</span></div>`);
       $("#exBreakdown").innerHTML = rows.join("");
       $("#exTotal").innerHTML = `${money(b.payout)} <small style="font-size:14px;color:var(--h-muted);font-weight:600">≈ ${leiOf(b.payout)} lei</small>`;
       const peak = S.isPeak(d.startTime), wh = S.isWeekendOrHoliday(d.date);
-      $("#exNote").textContent = (peak ? "Interval de vârf — clientul plătește mai mult, deci încasezi mai mult." : "În afara orelor de vârf — preț de bază.") + (wh ? " Weekend/sărbătoare — încasezi în plus." : "");
+      let note = (peak ? "Interval de vârf — clientul plătește mai mult, deci încasezi mai mult." : "În afara orelor de vârf — preț de bază.") + (wh ? " Weekend/sărbătoare — încasezi în plus." : "");
+      if (b.urgentAdd || b.refundableAdd) note += " Opțiunile ⚡/🔓 sunt prime ale platformei — nu îți schimbă câștigul.";
+      $("#exNote").textContent = note;
     }
     const exSection = $("#exSim");
     if (exSection) {
       // forțează consumabilele la valorile implicite (unele browsere restaurează valori vechi)
       document.querySelectorAll(".exCons").forEach(i => { i.value = i.dataset.def || "0"; });
+      // Urgență / Rambursabil — exclusive (ca la client)
+      const eu = $("#exUrgent"), er = $("#exRefundable");
+      if (eu && er) {
+        eu.addEventListener("change", () => { if (eu.checked) er.checked = false; });
+        er.addEventListener("change", () => { if (er.checked) eu.checked = false; });
+      }
       ["input", "change"].forEach(ev => exSection.addEventListener(ev, exRecalc));
       exRecalc();
     }
