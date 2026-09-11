@@ -1239,16 +1239,24 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     // dacă niciun serviciu lenjerie nu preia consumabilele, achiziția + 30% adaos rămân la platformă
     const consAdminTotal = round2(consAdminMarkup + (consLaundryHandles ? 0 : consCostEur + consLaundryMarkup));
 
-    // comision total al platformei = comision servicii + partea admin din consumabile + primele de opțiuni (+20% rambursabil, +30% urgență)
-    const commission = round2(p.serviceTotal * pct / 100 + consAdminTotal + (p.refundableAdd || 0) + (p.urgentAdd || 0));
+    // Primele de opțiuni (⚡ urgență, 🔓 rambursabil) merg la AGENT ca venit,
+    // cu comisionul standard: agentul primește (100−comision)%, platforma ia comisionul.
+    const urgentAgent = round2((p.urgentAdd || 0) * (1 - pct / 100));
+    const refundableAgent = round2((p.refundableAdd || 0) * (1 - pct / 100));
+    const optionsAgent = round2(urgentAgent + refundableAgent);
+    const optionsCommission = round2(((p.urgentAdd || 0) + (p.refundableAdd || 0)) * pct / 100);
 
-    // plata Agentului Cleaning de curățenie = curățenie + 50% adaos consumabile (+ lenjerie dacă a preluat-o el)
-    const payout = round2(cleaningPayout + consExecutantPayout + (linenTaken ? linenPayout : 0));
+    // comision total al platformei = comision servicii + partea admin din consumabile + comisionul din prime
+    const commission = round2(p.serviceTotal * pct / 100 + consAdminTotal + optionsCommission);
+
+    // plata Agentului Cleaning = curățenie + 50% adaos consumabile (+ lenjerie dacă a preluat-o el) + partea din prime
+    const payout = round2(cleaningPayout + consExecutantPayout + (linenTaken ? linenPayout : 0) + optionsAgent);
 
     return {
       ...p, pct, commission, cleaningPayout, linenPayout, linenTaken,
       consCostEur, consMarkupEur, consExecutantPayout, consLaundryPayout, consLaundryHandles, consAdminTotal,
       consumablesPayout: consExecutantPayout,   // (compat) partea Agentului Cleaning de curățenie
+      urgentAgent, refundableAgent, optionsAgent,
       payout,
     };
   }
@@ -3562,7 +3570,7 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
               <div id="exBreakdown" class="sim-breakdown"></div>
               <div class="sim-total-row"><span>Tu primești</span><span id="exTotal" class="sim-total">€0.00</span></div>
               <p class="hint" id="exNote" style="color:var(--h-muted);margin:6px 0 0"></p>
-              <p class="hint" style="color:var(--h-muted);margin:8px 0 0;font-size:12px">ℹ️ Opțiunile clientului (⚡ urgentă +${C.urgentSurchargePct}% · 🔓 rambursabilă +${C.refundableSurchargePct}%) sunt prime ale platformei — nu îți schimbă câștigul de mai sus.</p>
+              <p class="hint" style="color:var(--h-muted);margin:8px 0 0;font-size:12px">ℹ️ Când clientul alege ⚡ urgentă (+${C.urgentSurchargePct}%) sau 🔓 rambursabil (+${C.refundableSurchargePct}%), <strong>primești și tu partea ta</strong> din prima (comisionul standard de ${S.commissionPct()}% rămâne la platformă).</p>
               <div class="hs-alt">
                 <button class="h-btn primary" type="button" data-reg="executant" style="width:100%">Înscrie-te ca Agent Cleaning</button>
                 <p class="hs-signup">Vezi solicitările plătite din zona ta după înregistrare.</p>
@@ -3698,14 +3706,14 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       if (b.linenTaken && b.linenSets > 0) rows.push(`<div class="sb-row"><span>+ 🧺 Lenjerie preluată (${b.linenSets} × ${C.linenSetPriceRon} lei · ${cleanPct}%)</span><span>+${money(b.linenPayout)}</span></div>`);
       // Sursa 3 — Consumabile (partea ta din adaos)
       if (b.consExecutantPayout > 0) rows.push(`<div class="sb-row"><span>+ 🧴 Consumabile (${C.consumableSplit.executant}% din adaos)</span><span>+${money(b.consExecutantPayout)}</span></div>`);
-      // Opțiunile clientului — clientul plătește în plus, dar surplusul merge la PLATFORMĂ (nu la agent)
-      if (b.urgentAdd) rows.push(`<div class="sb-row" style="color:var(--h-muted)"><span>⚡ Urgență — client plătește +${money(b.urgentAdd)} <small>→ platformă</small></span><span>+€0.00</span></div>`);
-      if (b.refundableAdd) rows.push(`<div class="sb-row" style="color:var(--h-muted)"><span>🔓 Rambursabil — client plătește +${money(b.refundableAdd)} <small>→ platformă</small></span><span>+€0.00</span></div>`);
+      // Opțiunile clientului (⚡/🔓) — clientul plătește în plus, iar TU primești partea ta (restul e comisionul platformei)
+      if (b.urgentAdd) rows.push(`<div class="sb-row"><span>+ ⚡ Urgență (client +${money(b.urgentAdd)} · partea ta ${cleanPct}%)</span><span>+${money(b.urgentAgent)}</span></div>`);
+      if (b.refundableAdd) rows.push(`<div class="sb-row"><span>+ 🔓 Rambursabil (client +${money(b.refundableAdd)} · partea ta ${cleanPct}%)</span><span>+${money(b.refundableAgent)}</span></div>`);
       $("#exBreakdown").innerHTML = rows.join("");
       $("#exTotal").innerHTML = `${money(b.payout)} <small style="font-size:14px;color:var(--h-muted);font-weight:600">≈ ${leiOf(b.payout)} lei</small>`;
       const peak = S.isPeak(d.startTime), wh = S.isWeekendOrHoliday(d.date);
       let note = (peak ? "Interval de vârf — clientul plătește mai mult, deci încasezi mai mult." : "În afara orelor de vârf — preț de bază.") + (wh ? " Weekend/sărbătoare — încasezi în plus." : "");
-      if (b.urgentAdd || b.refundableAdd) note += " Opțiunile ⚡/🔓 sunt prime ale platformei — nu îți schimbă câștigul.";
+      if (b.urgentAdd || b.refundableAdd) note += " Opțiunile ⚡/🔓 alese de client îți cresc și ție câștigul.";
       $("#exNote").textContent = note;
     }
     const exSection = $("#exSim");
@@ -3794,7 +3802,7 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
               <div id="laBreakdown" class="sim-breakdown"></div>
               <div class="sim-total-row"><span>Tu primești</span><span id="laTotal" class="sim-total">€0.00</span></div>
               <p class="hint" id="laNote" style="color:var(--h-muted);margin:6px 0 0"></p>
-              <p class="hint" style="color:var(--h-muted);margin:8px 0 0;font-size:12px">ℹ️ Opțiunile clientului (⚡ urgentă +${C.urgentSurchargePct}% · 🔓 rambursabilă +${C.refundableSurchargePct}%) sunt prime ale platformei — nu îți schimbă câștigul de mai sus.</p>
+              <p class="hint" style="color:var(--h-muted);margin:8px 0 0;font-size:12px">ℹ️ Opțiunile ⚡ urgentă / 🔓 rambursabil merg către Agentul Cleaning — nu îți schimbă câștigul din lenjerie și consumabile.</p>
               <div class="hs-alt">
                 <button class="h-btn primary" type="button" data-reg="spalatorie" style="width:100%">Devino serviciu de lenjerie</button>
                 <p class="hs-signup">Preiei rute din zona ta după înregistrare.</p>
