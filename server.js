@@ -25,6 +25,40 @@ if (STRIPE_SECRET_KEY) {
   console.log("[stripe] fără chei — aplicația folosește plata simulată");
 }
 
+/* ---------------- Notificări: email (SMTP, „de la admin") + SMS (SMSO.ro) ----------------
+   Solicitantul primește email + SMS când Agentul Cleaning ÎNCEPE lucrul și când îl TERMINĂ.
+   Configurare prin variabile de mediu (Railway → Variables):
+     Email:  SMTP_HOST, SMTP_PORT (465 SSL / 587 STARTTLS), SMTP_USER, SMTP_PASS,
+             MAIL_FROM (implicit = SMTP_USER sau ADMIN_EMAIL), MAIL_FROM_NAME
+     SMS:    SMSO_API_KEY, SMSO_SENDER (ID-ul de expeditor aprobat în contul SMSO)
+   Fără aceste variabile, notificările sunt pur și simplu sărite (fără eroare). */
+const SMTP_HOST = process.env.SMTP_HOST || "";
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || "465", 10);
+const SMTP_USER = process.env.SMTP_USER || "";
+const SMTP_PASS = process.env.SMTP_PASS || "";
+const MAIL_FROM = process.env.MAIL_FROM || SMTP_USER || ADMIN_EMAIL;
+const MAIL_FROM_NAME = process.env.MAIL_FROM_NAME || "Sleep & Go Cleaning";
+let mailer = null;
+if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+  try {
+    const nodemailer = require("nodemailer");
+    mailer = nodemailer.createTransport({
+      host: SMTP_HOST, port: SMTP_PORT, secure: SMTP_PORT === 465,
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+    });
+    console.log("[mail] SMTP activat:", SMTP_HOST + ":" + SMTP_PORT, "· expeditor", MAIL_FROM);
+  } catch (e) { console.log("[mail] nodemailer lipsește sau config invalidă:", e.message); }
+} else {
+  console.log("[mail] fără SMTP — notificările email sunt dezactivate (setează SMTP_HOST/USER/PASS)");
+}
+
+const PHONE = process.env.PHONE || "0758.369.641";
+const SMSO_API_KEY = process.env.SMSO_API_KEY || "";
+const SMSO_SENDER = process.env.SMSO_SENDER || "";
+const SMSO_URL = process.env.SMSO_URL || "https://app.smso.ro/api/v1/send";
+if (SMSO_API_KEY && SMSO_SENDER) console.log("[sms] SMSO activat · expeditor", SMSO_SENDER);
+else console.log("[sms] fără SMSO — notificările SMS sunt dezactivate (setează SMSO_API_KEY/SMSO_SENDER)");
+
 /* Calculul prețului pe SERVER (nu se poate falsifica din client).
    Reproduce priceOf() din js/store.js: bază/m², +30% vârf (10–15), +10% weekend/sărbătoare,
    lenjerie 50 lei/set, consumabile (achiziție + 10% adaos). Întoarce totalul în bani (RON*100). */
@@ -174,8 +208,212 @@ async function getState() {
 }
 async function saveState(st) { await store.set("state", JSON.stringify(st)); }
 
+/* ---------------- Trimitere efectivă email + SMS ---------------- */
+async function sendEmail(to, subject, text) {
+  if (!mailer || !to) return { ok: false, skipped: true };
+  try {
+    await mailer.sendMail({ from: `"${MAIL_FROM_NAME}" <${MAIL_FROM}>`, to, subject, text });
+    console.log("[mail] trimis către", to, "·", subject);
+    return { ok: true };
+  } catch (e) { console.log("[mail] eroare către", to, ":", e.message); return { ok: false, error: e.message }; }
+}
+// Normalizează la format E.164 pentru România (+40…)
+function normalizePhoneRo(p) {
+  let s = String(p || "").replace(/[\s.\-()]/g, "");
+  if (!s) return "";
+  if (s[0] === "+") return s;
+  if (s.slice(0, 4) === "0040") return "+" + s.slice(2);
+  if (s.slice(0, 2) === "40" && s.length >= 11) return "+" + s;
+  if (s[0] === "0") return "+40" + s.slice(1);
+  return s;
+}
+async function sendSms(to, body) {
+  if (!SMSO_API_KEY || !SMSO_SENDER || !to) return { ok: false, skipped: true };
+  const phone = normalizePhoneRo(to);
+  if (!phone) return { ok: false, skipped: true };
+  try {
+    const params = new URLSearchParams({ sender: SMSO_SENDER, to: phone, body });
+    const resp = await fetch(SMSO_URL, {
+      method: "POST",
+      headers: { "X-Authorization": SMSO_API_KEY, "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString(),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (resp.ok && (Number(data.status) === 200 || data.responseToken)) {
+      console.log("[sms] trimis către", phone, "· token", data.responseToken || "-");
+      return { ok: true };
+    }
+    console.log("[sms] răspuns neașteptat (", resp.status, "):", JSON.stringify(data).slice(0, 200));
+    return { ok: false, error: "SMSO status " + resp.status };
+  } catch (e) { console.log("[sms] eroare către", phone, ":", e.message); return { ok: false, error: e.message }; }
+}
+
+/* ---------------- Notificări la START / FINAL curățenie ----------------
+   Detectăm tranzițiile comparând starea veche (server) cu cea nouă (client).
+   Flag-urile notifiedStartAt / notifiedEndAt asigură că se trimite o singură dată. */
+function reqStarted(r) { return !!r && r.status === "in_progres"; }
+function reqEnded(r) { return !!r && (r.status === "finalizat" || !!r.readyAt); }
+// Marchează tranzițiile pe starea nouă (setează flag-uri) și întoarce lista de notificări de trimis.
+function markTransitions(oldSt, newSt) {
+  const oldById = new Map((oldSt.requests || []).map(r => [r.id, r]));
+  const jobs = [];
+  for (const r of (newSt.requests || [])) {
+    const old = oldById.get(r.id);
+    // păstrează flag-urile deja setate pe server (clientul poate să nu le retrimită)
+    if (old && old.notifiedStartAt && !r.notifiedStartAt) r.notifiedStartAt = old.notifiedStartAt;
+    if (old && old.notifiedEndAt && !r.notifiedEndAt) r.notifiedEndAt = old.notifiedEndAt;
+    if (!r.notifiedStartAt && reqStarted(r)) {
+      // tranziție reală doar dacă am văzut anterior solicitarea într-o stare mai timpurie;
+      // dacă apare direct „pornită" (ex: prima rulare pe date vechi), doar marcăm flag-ul, fără trimitere
+      const genuine = !!old && !reqStarted(old);
+      r.notifiedStartAt = Date.now();
+      if (genuine) jobs.push({ reqId: r.id, kind: "start" });
+    }
+    if (!r.notifiedEndAt && reqEnded(r)) {
+      const genuine = !!old && !reqEnded(old);
+      r.notifiedEndAt = Date.now();
+      if (genuine) jobs.push({ reqId: r.id, kind: "end" });
+    }
+  }
+  return jobs;
+}
+async function notifyRequester(st, reqId, kind) {
+  const r = (st.requests || []).find(x => x.id === reqId);
+  if (!r) return;
+  const requester = (st.users || []).find(u => u.id === r.requesterId);
+  if (!requester) return;
+  const addr = r.address || r.area || "locația ta";
+  const when = r.date ? ` (programare ${r.date}${r.startTime ? " " + r.startTime : ""})` : "";
+  let subject, text, sms;
+  if (kind === "start") {
+    subject = "Curățenia a început — " + addr;
+    text = `Bună, ${requester.name || ""}!\n\nAgentul Cleaning a început curățenia la ${addr}${when}.\n`
+         + `Te anunțăm din nou imediat ce locația este gata pentru oaspeți.\n\n— Sleep & Go Cleaning`;
+    sms = `Sleep & Go: curatenia a inceput la ${addr}. Te anuntam cand e gata.`;
+  } else {
+    subject = "Locația e gata pentru oaspeți — " + addr;
+    text = `Bună, ${requester.name || ""}!\n\nCurățenia la ${addr}${when} este finalizată — locația este gata pentru oaspeți.\n\n`
+         + `Îți mulțumim că folosești Sleep & Go Cleaning!\n\n— Sleep & Go Cleaning`;
+    sms = `Sleep & Go: locatia ${addr} este gata pentru oaspeti. Multumim!`;
+  }
+  await Promise.all([sendEmail(requester.email, subject, text), sendSms(requester.phone, sms)]);
+}
+
 function uid(p) { return p + "_" + crypto.randomBytes(6).toString("hex"); }
 function publicUser(u) { const { password, ...rest } = u || {}; return rest; }
+
+/* =========================================================
+   NEWSLETTER — abonare din footer + secvențe email la 2 zile (drip)
+   - Abonații stau în state.newsletter.subs (server = sursă de adevăr; clienții nu-i pot modifica prin /api/state)
+   - Secvențele (conținutul) + intervalul stau în state.newsletter.seq / intervalDays → EDITABILE din admin
+   - Motorul drip rulează pe server (setInterval) și trimite prin SMTP-ul deja configurat
+   ========================================================= */
+const NEWSLETTER_CATEGORIES = ["solicitant", "executant", "spalatorie", "rental"];
+function defaultNewsletterSeq() {
+  return {
+    solicitant: [
+      { subject: "Bine ai venit la Sleep & Go Cleaning 🧽", body:
+        "Bună{name}!\n\nÎți mulțumim pentru interes. Sleep & Go Cleaning este platforma de curățenie în regim hotelier pentru închirieri pe termen scurt (Airbnb, Booking) din București și Ilfov.\n\nCe facem pentru tine:\n• Turnover complet între check-out și check-in — curățenie, schimbat lenjeria, pregătit locația.\n• Plătești în avans, securizat, iar agenții din zona ta se înscriu la solicitarea ta — tu alegi pe cine vrei, după rating și recenzii.\n• Preț transparent, de la 0,6 €/m². Vezi totalul exact înainte să plătești.\n\nÎn zilele următoare îți trimitem, pas cu pas, cum funcționează totul." },
+      { subject: "Cum funcționează: de la solicitare la locație gata 🛏️", body:
+        "Bună{name}!\n\nUite cât de simplu e:\n1) Adaugi locația (cu un document de suprafață) — administratorul o validează.\n2) Alegi data și intervalul (program 8:00–22:00) și plătești în avans prin Stripe.\n3) Agenții Cleaning din zona ta se înscriu; tu îl alegi pe cel dorit.\n4) Primești notificări prin email și SMS când curățenia ÎNCEPE și când se TERMINĂ (locația e gata pentru oaspeți).\n\nPreț dinamic: +30% în intervalul de vârf 10:00–15:00, +10% în weekend și de sărbători. Fără costuri ascunse." },
+      { subject: "Lenjerie, consumabile și garanție 🧺", body:
+        "Bună{name}!\n\nCâteva lucruri care îți fac viața mai ușoară:\n• Lenjerie: îți etichetăm individual fiecare set și intră într-un circuit continuu (locație → spălătorie → depozitat la agent → înapoi), ca la fiecare check-in să existe lenjerie curată.\n• Consumabile la cerere (hârtie, apă, cafea, produse de curățenie).\n• Opțiuni: ⚡ Urgență (rezervi cu min. 5h înainte) și 🔓 Rambursabil (anulezi și primești 90% înapoi).\n• Garanție: dacă nu se face în intervalul rezervat → banii înapoi + 50 lei.\n• Agentul poate filma video înainte/după — util pentru despăgubiri la Airbnb/Booking.\n\nCând ești gata, creează-ți cont și trimite prima solicitare." },
+    ],
+    executant: [
+      { subject: "Bun venit în rețeaua de Agenți Cleaning 🧹", body:
+        "Bună{name}!\n\nMulțumim pentru interesul de a deveni Agent Cleaning în rețeaua Sleep & Go. Primești lucrări plătite în avans din zona ta, fără să cauți clienți.\n\nPe scurt:\n• Primești 70% din prețul curățeniei (comision platformă 30%).\n• Clientul plătește în avans — banii sunt garantați înainte să începi.\n• Tu decizi ce lucrări preiei.\n\nUrmează detaliile despre câștig și cum preiei lucrări." },
+      { subject: "Cum preiei lucrări și cum ești plătit 💸", body:
+        "Bună{name}!\n\nFluxul tău de lucru:\n1) Vezi doar solicitările plătite din zona ta.\n2) Te înscrii la cele care ți se potrivesc; clientul te alege după rating și recenzii.\n3) Faci curățenia, anunți «gata pentru oaspeți» și încasezi automat.\n\nBonusuri: adaosurile de vârf (+30%) și weekend/sărbători (+10%) îți cresc și ție partea. Când clientul alege ⚡ urgență (+40%) sau 🔓 rambursabil (+20%), primești și tu partea ta din primă." },
+      { subject: "Lenjerie, consumabile, garanție și video 🎥", body:
+        "Bună{name}!\n\nMai multe surse de venit:\n• Lenjerie: dacă o speli tu, primești 70% din tarif (50 lei/set). Sau o lași Serviciului de lenjerie.\n• Consumabile: îți recuperezi achiziția + 50% din adaos.\n• La înscriere: o garanție returnabilă care acoperă lenjeria și consumabilele din grija ta.\n• Buton video înainte/după — dovada necesară pentru despăgubiri (Airbnb/Booking).\n\nÎnscrie-te ca PFA/PFI/SRL și preia prima lucrare din zona ta." },
+    ],
+    spalatorie: [
+      { subject: "Bun venit — Serviciu de lenjerie Sleep & Go 🧺", body:
+        "Bună{name}!\n\nMulțumim pentru interesul de a deveni Serviciu de lenjerie partener. Procesezi lenjeria din regim hotelier din zona ta — volume constante, plată după procesare.\n\nCâștigi 70% din prețul fiecărui set spălat (50 lei/set), plus partea din consumabile. Urmează detaliile." },
+      { subject: "Rute, spălare și distribuție de consumabile 🚐", body:
+        "Bună{name}!\n\nCum câștigi:\n• Spălare lenjerie: 70% din tarif (50 lei/set) — speli, calci și returnezi.\n• Consumabile: distribui Agenților Cleaning și primești 30% din adaos (achiziția ți se rambursează).\n• Lenjerie închiriată: o speli tot tu și primești 70% din spălare.\n\nPreiei seturile pe care agentul din zona ta nu le spală, sau o rută întreagă." },
+      { subject: "Cum ești plătit și ce îți trebuie 💶", body:
+        "Bună{name}!\n\nÎncasezi după ce marchezi lenjeria gata (spălată, călcată, adusă), din avansul deja plătit de client.\n\nDe ce ai nevoie: mașină de spălat profesională + calandru, un autovehicul pentru livrări, spațiu de depozitare și o garanție returnabilă la înscriere.\n\nÎnscrie-te ca PFA/PFI/SRL și preia primele rute din zona ta." },
+    ],
+    rental: [
+      { subject: "Închiriere lenjerii regim hotelier — bun venit 🛏️", body:
+        "Bună{name}!\n\nMulțumim pentru interesul față de serviciul de închiriere lenjerii. Nu mai cumperi lenjerie proprie — o închiriezi de la noi: ți-o aducem, o ridicăm după check-out, o spălăm și o returnăm. Zero investiție inițială.\n\nTe contactăm cu tarifele potrivite zonei și numărului de lenjerii de care ai nevoie." },
+      { subject: "Ce include un set și cum funcționează circuitul 🧼", body:
+        "Bună{name}!\n\nUn set de lenjerie = 1 plic, 1 cearșaf, 2 fețe de pernă, 2 prosoape și 1 prosop de baie. Fiecare set este etichetat individual, ca să nu se încurce cu ale altcuiva.\n\nServiciul de lenjerie ridică lenjeria folosită, o spală și o calcă, apoi o readuce curată — circuitul se repetă la fiecare check-in, fără efort din partea ta." },
+      { subject: "Următorii pași și zonele deservite 📍", body:
+        "Bună{name}!\n\nAcoperim București (toate sectoarele) și localitățile limitrofe din Ilfov. Îți confirmăm disponibilitatea și tarifele la contact.\n\nPoți combina închirierea de lenjerii cu serviciul complet de curățenie în regim hotelier — o singură platformă pentru tot." },
+    ],
+  };
+}
+function ensureNewsletter(st) {
+  if (!st.newsletter) st.newsletter = {};
+  const n = st.newsletter;
+  if (!Array.isArray(n.subs)) n.subs = [];
+  if (!n.seq || typeof n.seq !== "object") n.seq = defaultNewsletterSeq();
+  else for (const c of NEWSLETTER_CATEGORIES) if (!Array.isArray(n.seq[c])) n.seq[c] = defaultNewsletterSeq()[c];
+  if (!(n.intervalDays > 0)) n.intervalDays = 2;
+  return n;
+}
+function unsubUrl(sub) {
+  const base = (process.env.PUBLIC_URL || "https://www.sleepandgocleaning.com").replace(/\/$/, "");
+  return base + "/api/newsletter/unsubscribe?id=" + encodeURIComponent(sub.id) + "&e=" + encodeURIComponent(sub.email);
+}
+function renderSeqEmail(step, sub) {
+  const name = sub.name ? (" " + String(sub.name).split(/\s+/)[0]) : "";
+  const body = String(step.body || "").replace(/\{name\}/g, name);
+  const footer = "\n\n—\nSleep & Go Cleaning · " + PHONE
+    + "\nDacă nu mai vrei aceste emailuri, dezabonează-te: " + unsubUrl(sub);
+  return { subject: step.subject || "Sleep & Go Cleaning", text: body + footer };
+}
+// Trimite pasul curent al secvenței către un abonat (fără a avansa)
+async function sendSeqStep(st, sub, stepIdx) {
+  const n = ensureNewsletter(st);
+  const seq = (n.seq[sub.category] || []);
+  const step = seq[stepIdx];
+  if (!step) return { ok: false, done: true };
+  const mail = renderSeqEmail(step, sub);
+  return sendEmail(sub.email, mail.subject, mail.text);
+}
+// Motorul drip: trimite pașii scadenți și programează următorul la `intervalDays` zile
+let newsletterTimer = null;
+async function processNewsletter() {
+  try {
+    const st = await getState();
+    const n = ensureNewsletter(st);
+    const now = Date.now();
+    const intervalMs = (n.intervalDays || 2) * 86400000;
+    let changed = false;
+    for (const sub of n.subs) {
+      if (sub.unsubscribed || sub.done) continue;
+      if (!(sub.nextSendAt <= now)) continue;
+      const seq = n.seq[sub.category] || [];
+      const idx = sub.step || 0;
+      if (idx >= seq.length) { sub.done = true; changed = true; continue; }
+      await sendSeqStep(st, sub, idx);           // trimite pasul curent
+      sub.step = idx + 1; sub.lastSentAt = now;
+      if (sub.step >= seq.length) sub.done = true;
+      else sub.nextSendAt = now + intervalMs;
+      changed = true;
+    }
+    if (changed) await saveState(st);
+  } catch (e) { console.log("[newsletter] drip eroare:", e.message); }
+}
+function startNewsletterEngine() {
+  if (newsletterTimer) return;
+  const everyMs = parseInt(process.env.NEWSLETTER_TICK_MS || (5 * 60 * 1000), 10); // verifică la 5 min
+  newsletterTimer = setInterval(processNewsletter, everyMs);
+  setTimeout(processNewsletter, 8000); // o primă verificare la scurt timp după pornire
+  console.log("[newsletter] motor drip activ (verificare la", Math.round(everyMs / 1000), "s )");
+}
+// Merge de protecție: clienții NU pot modifica lista de abonați prin /api/state (server = sursă de adevăr)
+function mergeNewsletter(prev, next) {
+  const pn = (prev && prev.newsletter) || {};
+  if (!next.newsletter || typeof next.newsletter !== "object") next.newsletter = {};
+  next.newsletter.subs = Array.isArray(pn.subs) ? pn.subs : (Array.isArray(next.newsletter.subs) ? next.newsletter.subs : []);
+  // seq + intervalDays: adminul le poate edita din client (incoming câștigă), cu fallback pe server/implicit
+  if (!next.newsletter.seq) next.newsletter.seq = pn.seq || defaultNewsletterSeq();
+  if (!(next.newsletter.intervalDays > 0)) next.newsletter.intervalDays = pn.intervalDays || 2;
+}
 
 // Aplică lista canonică de produse pe baza existentă (o singură dată per versiune)
 async function ensureProducts() {
@@ -385,9 +623,18 @@ app.post("/api/state", async (req, res) => {
   const incoming = req.body && req.body.state;
   if (!incoming || typeof incoming !== "object")
     return res.status(400).json({ ok: false, error: "Stare invalidă." });
-  // păstrăm parolele intacte: state nu conține parole, deci doar salvăm
+  // detectăm tranzițiile (start/final curățenie) și marcăm flag-urile pe starea nouă
+  let jobs = [];
+  try {
+    const prev = await getState();
+    jobs = markTransitions(prev, incoming);
+    mergeNewsletter(prev, incoming);   // abonații rămân sub controlul serverului
+  } catch (e) { console.log("[notify] diff eșuat:", e.message); }
+  // păstrăm parolele intacte: state nu conține parole, deci doar salvăm (cu flag-urile de notificare)
   await saveState(incoming);
   res.json({ ok: true });
+  // trimitem notificările DUPĂ ce am răspuns clientului (nu blocăm salvarea)
+  for (const j of jobs) notifyRequester(incoming, j.reqId, j.kind).catch(() => {});
 });
 
 // --- Plată reală: creează sesiunea de Checkout (autentificat, doar propria solicitare) ---
@@ -515,6 +762,107 @@ app.post("/api/lead", async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
+/* ---------------- Newsletter: abonare publică din footer ---------------- */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+app.post("/api/newsletter", async (req, res) => {
+  try {
+    const b = req.body || {};
+    const category = NEWSLETTER_CATEGORIES.includes(b.category) ? b.category : null;
+    const email = String(b.email || "").trim().toLowerCase();
+    if (!category) return res.status(400).json({ ok: false, error: "Categorie invalidă." });
+    if (!EMAIL_RE.test(email)) return res.status(422).json({ ok: false, error: "Email invalid." });
+    const st = await getState();
+    const n = ensureNewsletter(st);
+    // dedupe: dacă există deja (categorie+email) și e activ, nu retrimitem
+    let sub = n.subs.find(s => s.category === category && s.email === email);
+    if (sub && !sub.unsubscribed) return res.json({ ok: true, already: true });
+    if (sub && sub.unsubscribed) {   // reactivare
+      sub.unsubscribed = false; sub.done = false; sub.step = 0; sub.nextSendAt = Date.now();
+    } else {
+      sub = {
+        id: uid("sub"), category, email,
+        name: String(b.name || "").slice(0, 120), phone: String(b.phone || "").slice(0, 40),
+        createdAt: Date.now(), step: 0, nextSendAt: Date.now(), lastSentAt: null, done: false, unsubscribed: false,
+      };
+      n.subs.push(sub);
+    }
+    await saveState(st);
+    res.json({ ok: true });
+    // trimite imediat primul email (pasul 0) și avansează, în fundal
+    (async () => {
+      try {
+        const st2 = await getState(); const n2 = ensureNewsletter(st2);
+        const s2 = n2.subs.find(s => s.id === sub.id); if (!s2 || s2.unsubscribed) return;
+        const seq = n2.seq[category] || [];
+        if ((s2.step || 0) < seq.length) {
+          await sendSeqStep(st2, s2, s2.step || 0);
+          s2.step = (s2.step || 0) + 1; s2.lastSentAt = Date.now();
+          if (s2.step >= seq.length) s2.done = true;
+          else s2.nextSendAt = Date.now() + (n2.intervalDays || 2) * 86400000;
+          await saveState(st2);
+        }
+      } catch (e) { console.log("[newsletter] primul email eroare:", e.message); }
+    })();
+  } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
+});
+
+// Dezabonare (link din email) — pagină simplă
+app.get("/api/newsletter/unsubscribe", async (req, res) => {
+  try {
+    const id = String(req.query.id || ""); const email = String(req.query.e || "").toLowerCase();
+    const st = await getState(); const n = ensureNewsletter(st);
+    const sub = n.subs.find(s => s.id === id && s.email === email);
+    if (sub) { sub.unsubscribed = true; await saveState(st); }
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.end(`<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dezabonare — Sleep & Go Cleaning</title><style>body{font-family:system-ui,Segoe UI,Arial,sans-serif;background:#f3f7fc;color:#1f2733;display:grid;place-items:center;min-height:100vh;margin:0}.c{background:#fff;border:1px solid #e3e9f1;border-radius:16px;padding:32px;max-width:440px;text-align:center;box-shadow:0 18px 50px rgba(31,60,110,.12)}h1{font-size:20px;margin:0 0 8px}p{color:#5c6875;line-height:1.6}a{color:#009FE3;font-weight:700;text-decoration:none}</style></head><body><div class="c"><div style="font-size:40px">🧽</div><h1>${sub ? "Te-ai dezabonat" : "Link invalid sau deja folosit"}</h1><p>${sub ? "Nu vei mai primi emailuri de la Sleep & Go Cleaning pe adresa <strong>" + email + "</strong>." : "Nu am găsit abonarea. Poate te-ai dezabonat deja."}</p><p><a href="https://www.sleepandgocleaning.com">← Înapoi la sleepandgocleaning.com</a></p></div></body></html>`);
+  } catch (e) { res.status(500).end("Eroare."); }
+});
+
+// Admin: șterge un abonat
+app.post("/api/newsletter/remove", async (req, res) => {
+  try {
+    const uidReq = readSession(req);
+    const st = await getState();
+    const me = (st.users || []).find(u => u.id === uidReq);
+    if (!me || me.role !== "admin") return res.status(403).json({ ok: false, error: "Doar administratorul." });
+    const id = req.body && req.body.id;
+    const n = ensureNewsletter(st);
+    const before = n.subs.length;
+    n.subs = n.subs.filter(s => s.id !== id);
+    await saveState(st);
+    res.json({ ok: true, removed: before - n.subs.length });
+  } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
+});
+
+// Admin: compune și trimite acum un email către o categorie (broadcast) — „email composer"
+app.post("/api/newsletter/broadcast", async (req, res) => {
+  try {
+    const uidReq = readSession(req);
+    const st = await getState();
+    const me = (st.users || []).find(u => u.id === uidReq);
+    if (!me || me.role !== "admin") return res.status(403).json({ ok: false, error: "Doar administratorul." });
+    const b = req.body || {};
+    const category = b.category === "all" ? "all" : (NEWSLETTER_CATEGORIES.includes(b.category) ? b.category : null);
+    const subject = String(b.subject || "").trim();
+    const bodyTxt = String(b.body || "").trim();
+    if (!category) return res.status(400).json({ ok: false, error: "Categorie invalidă." });
+    if (!subject || !bodyTxt) return res.status(422).json({ ok: false, error: "Completează subiectul și mesajul." });
+    if (!mailer) return res.json({ ok: false, error: "SMTP neconfigurat (setează SMTP_HOST/USER/PASS)." });
+    const n = ensureNewsletter(st);
+    const targets = n.subs.filter(s => !s.unsubscribed && (category === "all" || s.category === category));
+    let sent = 0;
+    for (const s of targets) {
+      const name = s.name ? (" " + String(s.name).split(/\s+/)[0]) : "";
+      const text = bodyTxt.replace(/\{name\}/g, name)
+        + "\n\n—\nSleep & Go Cleaning · " + PHONE
+        + "\nDezabonare: " + unsubUrl(s);
+      const r = await sendEmail(s.email, subject, text);
+      if (r.ok) sent++;
+    }
+    res.json({ ok: true, sent, total: targets.length });
+  } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
+});
+
 // --- SEO: robots.txt + sitemap.xml dinamic (listează articolele de blog) ---
 const SITE_URL = (process.env.SITE_URL || "https://www.sleepandgocleaning.com").replace(/\/+$/, "");
 
@@ -560,5 +908,7 @@ app.get("*", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
   await ensureProducts(); // aplică lista de produse (versiune)
   await ensureAdmin();   // creează adminul dacă lipsește
   await promoteExecutants(); // conversie one-off solicitant → Agent Cleaning (env PROMOTE_EXECUTANT)
+  try { const st = await getState(); ensureNewsletter(st); await saveState(st); } catch (e) {}
+  startNewsletterEngine();   // motor drip newsletter (secvențe email la 2 zile)
   app.listen(PORT, () => console.log("Sleep & Go pe portul " + PORT));
 })();

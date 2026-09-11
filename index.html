@@ -433,6 +433,22 @@ a.pill.contact:hover { background: var(--brand); color: #fff; }
   .modal { max-height: none !important; overflow: visible !important; box-shadow: none !important; border: none !important; padding: 0 !important; max-width: 100% !important; }
 }
 
+/* ===== Admin: Newsletter ===== */
+.news-counts { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+.news-counts .nc { background: var(--card-2, #22323f); border: 1px solid var(--line, #2c3e4f); border-radius: 12px; padding: 12px 16px; min-width: 96px; text-align: center; }
+.news-counts .nc.total { background: #10485f; border-color: #1c6c8c; }
+.news-counts .nc-n { display: block; font-size: 24px; font-weight: 800; color: #eaf3f9; line-height: 1.1; }
+.news-counts .nc-l { display: block; font-size: 12px; color: var(--muted, #93a6b5); margin-top: 2px; }
+.seq-step { border: 1px solid var(--line, #2c3e4f); border-radius: 12px; padding: 12px; margin: 10px 0; background: var(--card-2, #22323f); }
+.seq-step-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.seq-step input.seqSubj { width: 100%; margin-bottom: 8px; }
+.seq-step textarea.seqBody { width: 100%; }
+.subs-table { display: flex; flex-direction: column; gap: 8px; }
+.subs-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border: 1px solid var(--line, #2c3e4f); border-radius: 10px; padding: 10px 12px; background: var(--card-2, #22323f); }
+.subs-row.off { opacity: .55; }
+.subs-row .sr-main { flex: 1 1 220px; min-width: 0; word-break: break-word; }
+.subs-row .sr-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
 /* =========================================================
    Sleep & Go Cleaning — HOME / LANDING
    Brand preluat de pe sleepandgocleaning.com:
@@ -830,6 +846,18 @@ body.landing-active { background: var(--h-bg); }
 .faq-shot-bar span:nth-child(3) { background: #28c840; }
 .faq-shot-frame img { display: block; width: 100%; height: auto; }
 .faq-shot figcaption { margin-top: 12px; text-align: center; font-size: 13.5px; color: var(--h-muted); line-height: 1.55; }
+
+/* ===== Bandă newsletter în footer ===== */
+.h-footer .foot-news { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .10); border-radius: 16px; padding: 22px 24px; margin-bottom: 34px; }
+.h-footer .foot-news .fn-text { flex: 1 1 260px; }
+.h-footer .foot-news .fn-text h4 { margin: 0 0 4px; color: #fff; font-size: 17px; }
+.h-footer .foot-news .fn-text p { margin: 0; color: #97a6b6; font-size: 13.5px; }
+.h-footer .fn-form { flex: 1 1 320px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.h-footer .fn-form input { flex: 1 1 140px; min-width: 0; background: #0e1826; border: 1px solid rgba(255, 255, 255, .14); color: #eaf1f8; border-radius: 10px; padding: 11px 13px; font-size: 14px; font-family: inherit; margin: 0; }
+.h-footer .fn-form input::placeholder { color: #8195a8; }
+.h-footer .fn-form input:focus { outline: none; border-color: var(--h-blue); }
+.h-footer .fn-form button { flex: 0 0 auto; }
+.h-footer .fn-note { flex-basis: 100%; margin: 4px 0 0; font-size: 13px; font-weight: 600; }
 
 </style>
 
@@ -1581,6 +1609,93 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       if (!db.rentalLeads) db.rentalLeads = [];
       const lead = { id: uid("lead"), name: data.name, phone: data.phone, email: data.email || "", locations: Number(data.locations) || 0, note: data.note || "", createdAt: Date.now() };
       db.rentalLeads.push(lead); save(db); return { ok: true, lead };
+    },
+
+    // ---- Newsletter (abonare din footer + secvențe gestionate din admin) ----
+    NEWSLETTER_CATEGORIES: ["solicitant", "executant", "spalatorie", "rental"],
+    NEWSLETTER_LABEL: { solicitant: "Solicitanți", executant: "Agenți Cleaning", spalatorie: "Serviciu lenjerie", rental: "Închiriere lenjerii" },
+    _defaultNewsletterSeq() {
+      const s = (subject, body) => ({ subject, body });
+      return {
+        solicitant: [
+          s("Bine ai venit la Sleep & Go Cleaning 🧽", "Bună{name}!\n\nSleep & Go Cleaning = curățenie în regim hotelier pentru închirieri pe termen scurt. Plătești în avans, agenții din zona ta se înscriu, iar tu alegi după rating. Preț de la 0,6 €/m²."),
+          s("Cum funcționează, pas cu pas 🛏️", "Bună{name}!\n\n1) Adaugi locația. 2) Programezi și plătești. 3) Alegi agentul. 4) Primești email + SMS când începe și când se termină curățenia. +30% în vârf (10–15), +10% weekend."),
+          s("Lenjerie, consumabile și garanție 🧺", "Bună{name}!\n\nLenjerie etichetată în circuit continuu, consumabile la cerere, opțiuni urgență/rambursabil, garanție bani înapoi + 50 lei, video înainte/după pentru despăgubiri Airbnb/Booking."),
+        ],
+        executant: [
+          s("Bun venit în rețeaua de Agenți Cleaning 🧹", "Bună{name}!\n\nPrimești 70% din prețul curățeniei, plată în avans garantată, lucrezi în zona ta, fără să cauți clienți."),
+          s("Cum preiei lucrări și cum ești plătit 💸", "Bună{name}!\n\nVezi solicitările plătite din zona ta, te înscrii, clientul te alege după rating. Încasezi automat după finalizare. Primele urgență/rambursabil merg și către tine."),
+          s("Lenjerie, consumabile, garanție și video 🎥", "Bună{name}!\n\nSpeli lenjeria (70%) sau o lași spălătoriei; consumabile: achiziția + 50% adaos; garanție returnabilă; buton video înainte/după pentru despăgubiri."),
+        ],
+        spalatorie: [
+          s("Bun venit — Serviciu de lenjerie 🧺", "Bună{name}!\n\nProcesezi lenjeria din regim hotelier din zona ta. Câștigi 70% din fiecare set spălat (50 lei/set), plus partea din consumabile."),
+          s("Rute, spălare și consumabile 🚐", "Bună{name}!\n\nPreiei seturile refuzate de agenți sau o rută întreagă. Consumabile: 30% din adaos. Lenjerie închiriată: o speli tot tu (70% din spălare)."),
+          s("Cum ești plătit și ce îți trebuie 💶", "Bună{name}!\n\nÎncasezi după ce marchezi lenjeria gata, din avansul clientului. Ai nevoie de mașină profesională + calandru, mașină de livrări, spațiu de depozitare, garanție returnabilă."),
+        ],
+        rental: [
+          s("Închiriere lenjerii — bun venit 🛏️", "Bună{name}!\n\nNu cumperi lenjerie proprie — o închiriezi de la noi. Ți-o aducem, o ridicăm, o spălăm și o returnăm. Zero investiție. Te contactăm cu tarifele."),
+          s("Ce include un set și circuitul 🧼", "Bună{name}!\n\nUn set = plic, cearșaf, 2 fețe de pernă, 2 prosoape, 1 prosop de baie, etichetat individual. Circuitul se repetă la fiecare check-in, fără efort din partea ta."),
+          s("Următorii pași și zonele deservite 📍", "Bună{name}!\n\nAcoperim București și Ilfov. Îți confirmăm tarifele la contact. Poți combina închirierea cu serviciul complet de curățenie."),
+        ],
+      };
+    },
+    _ensureNewsletter() {
+      if (!db.newsletter) db.newsletter = {};
+      const n = db.newsletter;
+      if (!Array.isArray(n.subs)) n.subs = [];
+      if (!n.seq || typeof n.seq !== "object") n.seq = this._defaultNewsletterSeq();
+      else this.NEWSLETTER_CATEGORIES.forEach(c => { if (!Array.isArray(n.seq[c])) n.seq[c] = this._defaultNewsletterSeq()[c]; });
+      if (!(n.intervalDays > 0)) n.intervalDays = 2;
+      return n;
+    },
+    newsletter() { return this._ensureNewsletter(); },
+    newsletterSubs(category) {
+      const subs = this._ensureNewsletter().subs.slice().sort((a, b) => b.createdAt - a.createdAt);
+      return category && category !== "all" ? subs.filter(s => s.category === category) : subs;
+    },
+    async subscribeNewsletter(data) {
+      const category = data && data.category;
+      const email = String((data && data.email) || "").trim().toLowerCase();
+      if (!this.NEWSLETTER_CATEGORIES.includes(category)) return { ok: false, error: "Categorie invalidă." };
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Introdu un email valid." };
+      if (MODE === "api") {
+        let r; try { r = await apiPOST("/api/newsletter", { category, email, name: data.name || "", phone: data.phone || "" }); }
+        catch (e) { return { ok: false, error: "Eroare de rețea." }; }
+        if (r && r.ok) { try { await refreshState(); } catch (e) {} }
+        return r || { ok: false, error: "A eșuat." };
+      }
+      const n = this._ensureNewsletter();
+      let sub = n.subs.find(s => s.category === category && s.email === email);
+      if (sub && !sub.unsubscribed) return { ok: true, already: true };
+      if (sub) { sub.unsubscribed = false; sub.done = false; sub.step = 0; }
+      else n.subs.push({ id: uid("sub"), category, email, name: data.name || "", phone: data.phone || "", createdAt: Date.now(), step: 0, nextSendAt: Date.now(), lastSentAt: null, done: false, unsubscribed: false });
+      save(db); return { ok: true };
+    },
+    // admin — editează secvențele / intervalul
+    updateNewsletterSeq(category, steps) {
+      const n = this._ensureNewsletter();
+      n.seq[category] = (steps || []).map(s => ({ subject: String(s.subject || ""), body: String(s.body || "") }));
+      save(db); return { ok: true };
+    },
+    setNewsletterInterval(days) {
+      const n = this._ensureNewsletter(); n.intervalDays = Math.max(1, Number(days) || 2); save(db); return { ok: true };
+    },
+    async removeSubscriber(id) {
+      if (MODE === "api") {
+        let r; try { r = await apiPOST("/api/newsletter/remove", { id }); } catch (e) { return { ok: false, error: "Eroare de rețea." }; }
+        if (r && r.ok) { try { await refreshState(); } catch (e) {} }
+        return r || { ok: false };
+      }
+      const n = this._ensureNewsletter(); n.subs = n.subs.filter(s => s.id !== id); save(db); return { ok: true };
+    },
+    async broadcastNewsletter(category, subject, body) {
+      if (MODE === "api") {
+        let r; try { r = await apiPOST("/api/newsletter/broadcast", { category, subject, body }); } catch (e) { return { ok: false, error: "Eroare de rețea." }; }
+        return r || { ok: false, error: "A eșuat." };
+      }
+      // local: simulăm trimiterea (fără server email)
+      const targets = this.newsletterSubs(category).filter(s => !s.unsubscribed);
+      return { ok: true, sent: 0, total: targets.length, local: true };
     },
 
     // ---- Consumabile (catalog gestionat de admin) ----
@@ -3042,6 +3157,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
 
         <!-- Footer -->
         <footer class="h-footer"><div class="wrap">
+          ${newsletterBand("solicitant")}
           <div class="cols">
             <div>
               <div class="foot-logo"><span>🧽</span> Sleep &amp; Go Cleaning</div>
@@ -3083,6 +3199,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     app.querySelectorAll("[data-view]").forEach(a => a.onclick = () => { setLandingView(a.dataset.view); window.scrollTo(0, 0); renderApp(); });
     app.querySelectorAll("[data-article]").forEach(a => a.onclick = () => openArticle(a.dataset.article));
     app.querySelectorAll("[data-share]").forEach(b => b.onclick = shareSite);
+    wireNewsletterForms();
     app.querySelectorAll("[data-scroll]").forEach(a => a.onclick = () => {
       const target = document.getElementById(a.dataset.scroll);
       if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -3215,8 +3332,9 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         </nav>
       </div></header>`;
   }
-  function blogChromeEnd() {
+  function blogChromeEnd(newsletterCategory) {
     return `<footer class="h-footer"><div class="wrap">
+      ${newsletterCategory ? newsletterBand(newsletterCategory) : ""}
       <div class="cols">
         <div><div class="foot-logo"><span>🧽</span> Sleep &amp; Go Cleaning</div><p>Curățenie profesională în regim hotelier pentru închirieri pe termen scurt.</p><p>📞 ${PHONE}</p></div>
         <div><h4>Explorează</h4><a data-home>Acasă</a><a data-view="executant">Agenți Cleaning</a><a data-view="spalatorie">Serviciu lenjerie</a><a data-view="rental">Închiriere lenjerii</a><a data-view="blog">Blog</a></div>
@@ -3231,6 +3349,48 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     app.querySelectorAll("[data-article]").forEach(a => a.onclick = () => openArticle(a.dataset.article));
     app.querySelectorAll("[data-go]").forEach(b => b.onclick = () => { const t = b.dataset.go; if (t === "top") { window.scrollTo({ top: 0, behavior: "smooth" }); return; } goAuth(t); });
     app.querySelectorAll("[data-share]").forEach(b => b.onclick = shareSite);
+    wireNewsletterForms();
+  }
+
+  /* ---------- Newsletter: bandă de abonare în footer + wiring ---------- */
+  function newsletterBand(category) {
+    const copy = {
+      solicitant: { t: "Primește noutățile pentru proprietari", p: "Ghiduri și informații despre curățenia în regim hotelier — trimise pe etape, la câteva zile distanță." },
+      executant:  { t: "Newsletter pentru Agenți Cleaning", p: "Emailuri regulate despre parteneriat: cum câștigi, cum preiei lucrări și noutăți." },
+      spalatorie: { t: "Newsletter pentru Serviciul de lenjerie", p: "Informații despre rute, câștiguri și cum funcționează parteneriatul." },
+      rental:     { t: "Newsletter — Închiriere lenjerii", p: "Îți trimitem detaliile serviciului de închiriere și te ținem la curent." },
+    }[category] || { t: "Newsletter", p: "" };
+    const nameField = category !== "solicitant"
+      ? `<input type="text" name="name" placeholder="Nume" autocomplete="name" />` : "";
+    const phoneField = category === "rental"
+      ? `<input type="tel" name="phone" placeholder="Telefon" autocomplete="tel" />` : "";
+    return `
+      <div class="foot-news">
+        <div class="fn-text"><h4>📬 ${copy.t}</h4><p>${copy.p}</p></div>
+        <form class="fn-form" data-newsletter="${category}" novalidate>
+          ${nameField}${phoneField}
+          <input type="email" name="email" placeholder="Emailul tău" autocomplete="email" required />
+          <button class="h-btn primary" type="submit">Abonează-te</button>
+        </form>
+        <p class="fn-note" data-fnnote hidden></p>
+      </div>`;
+  }
+  function wireNewsletterForms() {
+    app.querySelectorAll("form[data-newsletter]").forEach(f => {
+      f.onsubmit = async (e) => {
+        e.preventDefault();
+        const category = f.dataset.newsletter;
+        const val = (n) => { const el = f.querySelector(`[name="${n}"]`); return el ? el.value.trim() : ""; };
+        const note = f.parentElement.querySelector("[data-fnnote]");
+        const btn = f.querySelector('button[type="submit"]');
+        const setNote = (msg, ok) => { if (note) { note.textContent = msg; note.style.color = ok ? "#0a7d3f" : "#c0392b"; note.hidden = false; } };
+        if (btn) { btn.disabled = true; btn.textContent = "Se trimite…"; }
+        const res = await S.subscribeNewsletter({ category, email: val("email"), name: val("name"), phone: val("phone") });
+        if (btn) { btn.disabled = false; btn.textContent = "Abonează-te"; }
+        if (res && res.ok) { setNote(res.already ? "Ești deja abonat cu acest email. 👍" : "Gata! Ți-am trimis primul email. Verifică inbox-ul. 📬", true); f.reset(); }
+        else setNote((res && res.error) || "Nu s-a putut face abonarea.", false);
+      };
+    });
   }
 
   /* ---------- SEO / AEO / GEO: meta tags + Open Graph + JSON-LD ---------- */
@@ -3628,7 +3788,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
           </div>
         </div></section>
         ${faqSection("Întrebări frecvente", "Despre închirierea de lenjerie", "Cum decurge serviciul de închiriere, ce conține un set și cum te înregistrezi.", rentalFaq, { soft: true })}
-        ${blogChromeEnd()}
+        ${blogChromeEnd("rental")}
       </div>
     `));
     wireLandingLinks();
@@ -3818,6 +3978,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         </div></section>
 
         <footer class="h-footer"><div class="wrap">
+          ${newsletterBand("executant")}
           <div class="cols">
             <div><div class="foot-logo"><span>🧽</span> Sleep &amp; Go Cleaning</div><p>Câștigă din curățenie profesională în regim hotelier.</p><p>📞 ${PHONE}</p></div>
             <div><h4>Agenți Cleaning</h4><a data-scroll="ex-castig">Cât câștigi</a><a data-scroll="ex-nevoie">Condiții</a><a data-scroll="ex-cum">Cum începi</a><a data-scroll="faq">Întrebări frecvente</a></div>
@@ -3831,6 +3992,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     app.querySelectorAll("[data-home]").forEach(a => a.onclick = () => { setLandingView("home"); window.scrollTo(0, 0); renderHome(); });
     app.querySelectorAll("[data-view]").forEach(a => a.onclick = () => { setLandingView(a.dataset.view); window.scrollTo(0, 0); renderApp(); });
     app.querySelectorAll("[data-share]").forEach(b => b.onclick = shareSite);
+    wireNewsletterForms();
     app.querySelectorAll("[data-reg]").forEach(b => b.onclick = () => { regRole = b.dataset.reg; goAuth("register"); });
     app.querySelectorAll("[data-go]").forEach(b => b.onclick = () => goAuth(b.dataset.go));
     app.querySelectorAll("[data-scroll]").forEach(a => a.onclick = () => {
@@ -4060,6 +4222,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         </div></section>
 
         <footer class="h-footer"><div class="wrap">
+          ${newsletterBand("spalatorie")}
           <div class="cols">
             <div><div class="foot-logo"><span>🧽</span> Sleep &amp; Go Cleaning</div><p>Spălare, călcat și distribuție de lenjerie în regim hotelier.</p><p>📞 ${PHONE}</p></div>
             <div><h4>Serviciu lenjerie</h4><a data-scroll="la-castig">Cât câștigi</a><a data-scroll="la-nevoie">Condiții</a><a data-scroll="la-cum">Cum începi</a><a data-scroll="faq">Întrebări frecvente</a></div>
@@ -4073,6 +4236,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     app.querySelectorAll("[data-home]").forEach(a => a.onclick = () => { setLandingView("home"); window.scrollTo(0, 0); renderHome(); });
     app.querySelectorAll("[data-view]").forEach(a => a.onclick = () => { setLandingView(a.dataset.view); window.scrollTo(0, 0); renderApp(); });
     app.querySelectorAll("[data-share]").forEach(b => b.onclick = shareSite);
+    wireNewsletterForms();
     app.querySelectorAll("[data-reg]").forEach(b => b.onclick = () => { regRole = b.dataset.reg; goAuth("register"); });
     app.querySelectorAll("[data-go]").forEach(b => b.onclick = () => goAuth(b.dataset.go));
     app.querySelectorAll("[data-scroll]").forEach(a => a.onclick = () => {
@@ -4970,6 +5134,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     const pendingLoc = S.pendingLocations().length;
     const stockAlerts = S.stockAlerts().length;
     const roleReqCount = S.pendingRoleRequests().length;
+    const newsCount = S.newsletterSubs().filter(s => !s.unsubscribed).length;
     app.appendChild(el(`
       <div class="page-head">
         <h1>Panou administrare</h1>
@@ -4986,6 +5151,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         <button data-t="time" class="${adminTab === "time" ? "active" : ""}">⏱️ Pontaj</button>
         <button data-t="users" class="${adminTab === "users" ? "active" : ""}">👥 Utilizatori${roleReqCount ? ` <span class="tab-alert">${roleReqCount}</span>` : ""}</button>
         <button data-t="blog" class="${adminTab === "blog" ? "active" : ""}">📝 Blog</button>
+        <button data-t="newsletter" class="${adminTab === "newsletter" ? "active" : ""}">📧 Newsletter${newsCount ? ` (${newsCount})` : ""}</button>
       </div>
       <div id="admBody"></div>
     `));
@@ -4999,6 +5165,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     else if (adminTab === "requests") renderAdminRequests(u);
     else if (adminTab === "time") renderAdminTime();
     else if (adminTab === "blog") renderAdminBlog(u);
+    else if (adminTab === "newsletter") renderAdminNewsletter(u);
     else renderAdminUsers();
   }
 
@@ -5043,6 +5210,117 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
       const p = S.blogById(b.dataset.blogdel); if (!p) return;
       if (!confirm(`Ștergi articolul „${p.title}"? Acțiunea nu se poate anula.`)) return;
       S.deleteBlogPost(p.id); await S.flush(); toast("Articol șters.", "ok"); renderAdmin(u);
+    });
+  }
+
+  /* ---- Admin: Newsletter (abonați + secvențe drip + email composer) ---- */
+  function renderAdminNewsletter(u) {
+    const body = $("#admBody");
+    const n = S.newsletter();
+    const cats = S.NEWSLETTER_CATEGORIES;
+    const label = S.NEWSLETTER_LABEL;
+    const subs = S.newsletterSubs();
+    const counts = {}; cats.forEach(c => counts[c] = subs.filter(s => s.category === c && !s.unsubscribed).length);
+    const totalActive = subs.filter(s => !s.unsubscribed).length;
+    const muted = "var(--muted,#8aa)";
+    body.innerHTML = `
+      <div class="card" style="margin-bottom:14px">
+        <strong>📧 Newsletter — abonați &amp; secvențe automate</strong>
+        <p class="hint" style="margin:4px 0 0;color:${muted}">Vizitatorii se abonează din footer-ul fiecărei pagini. Secvențele se trimit automat prin email (SMTP), câte un mesaj la fiecare <strong>${n.intervalDays}</strong> zile. Trimiterea reală o face serverul.</p>
+        <div class="news-counts">
+          ${cats.map(c => `<div class="nc"><span class="nc-n">${counts[c]}</span><span class="nc-l">${label[c]}</span></div>`).join("")}
+          <div class="nc total"><span class="nc-n">${totalActive}</span><span class="nc-l">Total activi</span></div>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:10px;margin-top:12px;flex-wrap:wrap">
+          <div class="field" style="max-width:200px;margin:0"><label>Interval între emailuri (zile)</label><input type="number" id="nlInterval" min="1" value="${n.intervalDays}" /></div>
+          <button class="btn btn-sm" id="nlSaveInterval">Salvează intervalul</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:14px">
+        <strong>✍️ Compune un email (trimite acum)</strong>
+        <p class="hint" style="margin:4px 0 10px;color:${muted}">Un mesaj unic către abonații aleși. Poți folosi <code>{name}</code> pentru prenume. Se adaugă automat semnătura și linkul de dezabonare.</p>
+        <div class="field"><label>Către</label><select id="bcCat"><option value="all">Toți abonații (${totalActive})</option>${cats.map(c => `<option value="${c}">${label[c]} (${counts[c]})</option>`).join("")}</select></div>
+        <div class="field"><label>Subiect</label><input id="bcSubj" placeholder="Subiectul emailului" /></div>
+        <div class="field"><label>Mesaj</label><textarea id="bcBody" rows="6" placeholder="Scrie mesajul…"></textarea></div>
+        <button class="btn" id="bcSend">📨 Trimite acum</button>
+      </div>
+
+      <div class="card" style="margin-bottom:14px">
+        <strong>🧩 Secvențe automate (drip) — pe categorii</strong>
+        <p class="hint" style="margin:4px 0 10px;color:${muted}">Emailurile trimise automat, în ordine, la abonare și apoi din ${n.intervalDays} în ${n.intervalDays} zile.</p>
+        <div class="field" style="max-width:280px"><label>Categorie</label><select id="seqCat">${cats.map(c => `<option value="${c}">${label[c]}</option>`).join("")}</select></div>
+        <div id="seqSteps"></div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+          <button class="btn btn-soft btn-sm" id="seqAdd">➕ Adaugă email</button>
+          <button class="btn" id="seqSave">💾 Salvează secvența</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <strong>👥 Abonați</strong>
+        <div id="subsList" style="margin-top:10px"></div>
+      </div>
+    `;
+
+    $("#nlSaveInterval").onclick = async () => { S.setNewsletterInterval($("#nlInterval").value); await S.flush(); toast("Interval salvat.", "ok"); renderAdmin(u); };
+
+    // ---- Composer broadcast ----
+    $("#bcSend").onclick = async () => {
+      const category = $("#bcCat").value, subject = $("#bcSubj").value.trim(), bodyTxt = $("#bcBody").value.trim();
+      if (!subject || !bodyTxt) { toast("Completează subiectul și mesajul.", "err"); return; }
+      const cnt = category === "all" ? totalActive : counts[category];
+      if (!cnt) { toast("Nu există abonați activi în această categorie.", "err"); return; }
+      if (!confirm(`Trimiți acest email către ${cnt} abonat(i) acum?`)) return;
+      const btn = $("#bcSend"); btn.disabled = true; btn.textContent = "Se trimite…";
+      const res = await S.broadcastNewsletter(category, subject, bodyTxt);
+      btn.disabled = false; btn.textContent = "📨 Trimite acum";
+      if (res && res.ok) {
+        toast(res.local ? `Mod local: ${res.total} destinatari (pe server se trimite real).` : `Trimis către ${res.sent}/${res.total} abonați.`, "ok");
+        $("#bcSubj").value = ""; $("#bcBody").value = "";
+      } else toast((res && res.error) || "Trimiterea a eșuat.", "err");
+    };
+
+    // ---- Editor secvențe ----
+    let curCat = cats[0];
+    const collectSteps = () => {
+      const ss = [...$("#seqSteps").querySelectorAll(".seqSubj")].map(x => x.value);
+      const bb = [...$("#seqSteps").querySelectorAll(".seqBody")].map(x => x.value);
+      const arr = ss.map((s, i) => ({ subject: s, body: bb[i] || "" }));
+      S.newsletter().seq[curCat] = arr;
+      return arr;
+    };
+    const renderSeqSteps = () => {
+      const steps = S.newsletter().seq[curCat] || [];
+      $("#seqSteps").innerHTML = steps.length ? steps.map((st, i) => `
+        <div class="seq-step">
+          <div class="seq-step-head"><strong>Email ${i + 1}</strong><span class="hint" style="color:${muted}">${i === 0 ? "la abonare" : "după " + (i * n.intervalDays) + " zile"}</span><button class="btn btn-sm seqDel" data-i="${i}" style="color:var(--err,#c33);margin-left:auto">🗑️</button></div>
+          <input class="seqSubj" value="${esc(st.subject)}" placeholder="Subiect" />
+          <textarea class="seqBody" rows="4" placeholder="Conținut… folosește {name} pentru prenume">${esc(st.body)}</textarea>
+        </div>`).join("") : `<p class="hint" style="color:${muted}">Nicio secvență. Apasă „Adaugă email".</p>`;
+      $("#seqSteps").querySelectorAll(".seqDel").forEach(b => b.onclick = () => {
+        collectSteps(); const arr = S.newsletter().seq[curCat]; arr.splice(Number(b.dataset.i), 1); renderSeqSteps();
+      });
+    };
+    $("#seqCat").onchange = (e) => { collectSteps(); curCat = e.target.value; renderSeqSteps(); };
+    $("#seqAdd").onclick = () => { collectSteps(); S.newsletter().seq[curCat].push({ subject: "", body: "" }); renderSeqSteps(); };
+    $("#seqSave").onclick = async () => { const arr = collectSteps(); S.updateNewsletterSeq(curCat, arr); await S.flush(); toast("Secvență salvată.", "ok"); };
+    renderSeqSteps();
+
+    // ---- Listă abonați ----
+    const list = S.newsletterSubs();
+    $("#subsList").innerHTML = list.length ? `<div class="subs-table">${list.map(s => {
+      const len = (S.newsletter().seq[s.category] || []).length;
+      const status = s.unsubscribed ? "dezabonat" : (s.done ? "finalizat" : `email ${Math.min(s.step || 0, len)}/${len}`);
+      return `<div class="subs-row${s.unsubscribed ? " off" : ""}">
+        <div class="sr-main"><strong>${esc(s.email)}</strong>${s.name ? " · " + esc(s.name) : ""}${s.phone ? " · " + esc(s.phone) : ""}</div>
+        <div class="sr-meta"><span class="badge">${esc(label[s.category] || s.category)}</span><span class="hint" style="color:${muted}">${status}</span></div>
+        <button class="btn btn-sm subDel" data-id="${esc(s.id)}" style="color:var(--err,#c33)">🗑️</button>
+      </div>`;
+    }).join("")}</div>` : `<p class="hint" style="color:${muted}">Niciun abonat încă. Apar aici după ce cineva se abonează din footer.</p>`;
+    $("#subsList").querySelectorAll(".subDel").forEach(b => b.onclick = async () => {
+      if (!confirm("Ștergi acest abonat definitiv?")) return;
+      await S.removeSubscriber(b.dataset.id); toast("Abonat șters.", "ok"); renderAdmin(u);
     });
   }
 
