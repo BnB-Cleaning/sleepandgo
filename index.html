@@ -1194,11 +1194,11 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
 
     const serviceTotal = round2(cleaningNet + linenEur);        // servicii (se comisionează)
     const baseTotal = round2(serviceTotal + consumablesEur);    // total înainte de opțiuni
-    // opțiuni cu suprataxă (calculate pe baseTotal, aditiv); surplusul rămâne la platformă
-    const refundable = !!req.refundable;
-    const refundableAdd = refundable ? round2(baseTotal * CONFIG.refundableSurchargePct / 100) : 0;
+    // opțiuni cu suprataxă — EXCLUSIVE (nu se cumulează): urgența are prioritate dacă cumva ambele sunt setate.
     const urgent = !!req.urgent;
+    const refundable = !!req.refundable && !urgent;   // rambursabilă doar dacă nu e urgentă
     const urgentAdd = urgent ? round2(baseTotal * CONFIG.urgentSurchargePct / 100) : 0;
+    const refundableAdd = refundable ? round2(baseTotal * CONFIG.refundableSurchargePct / 100) : 0;
     const total = round2(baseTotal + refundableAdd + urgentAdd);
     return {
       cleaning, peakPct, peakAdd, surPct, surcharge, cleaningNet,
@@ -1763,9 +1763,9 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         sqm: Number(loc.sqm),      // exact din documentul aprobat
         linens: !!data.linens,     // cu lenjerie (tarif) / fără (lenjeria proprie a clientului)
         linenSets: Number(data.linenSets || 0),
-        refundable: !!data.refundable,   // opțiune rambursabilă (+20%): se poate cere refund până la 9:00 în ziua curățeniei
+        urgent: !!data.urgent,           // opțiune urgență (+40%): plasată cu minim 5h înainte de începere
+        refundable: !!data.refundable && !data.urgent,   // rambursabilă (+20%) — EXCLUSIVĂ cu urgența
         refundedAt: null,
-        urgent: !!data.urgent,           // opțiune urgență (+30%): plasată cu minim 5h înainte de începere
         // serviciul de lenjerie poate fi preluat separat de un Agent Cleaning
         linenExecutorId: null, linenDone: false, linenPayoutStatus: "pending",
         date: data.date,
@@ -2106,7 +2106,7 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       <div class="h-section-head">
         <div class="eyebrow">📋 Cum rezervi</div>
         <h2>Modalități de solicitare</h2>
-        <p>Alegi cum trimiți solicitarea — vezi termenul și costul fiecărei variante. Opțiunile se pot combina.</p>
+        <p>Alegi <strong>una</strong> dintre variante (sau niciuna) — nu se cumulează. Vezi termenul și costul fiecăreia.</p>
       </div>
       <div class="modes-grid">
         <div class="mode-card">
@@ -3009,6 +3009,12 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     if (simSection) {
       // forțează consumabilele la 0 la încărcare (unele browsere restaurează valori vechi)
       document.querySelectorAll(".simCons").forEach(i => { i.value = "0"; });
+      // Urgență / Rambursabil — exclusive (nu se cumulează)
+      const su = $("#simUrgent"), sr = $("#simRefundable");
+      if (su && sr) {
+        su.addEventListener("change", () => { if (su.checked) sr.checked = false; });
+        sr.addEventListener("change", () => { if (sr.checked) su.checked = false; });
+      }
       ["input", "change"].forEach(ev => simSection.addEventListener(ev, recalcSim));
       recalcSim();
     }
@@ -3675,10 +3681,14 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       });
       const commissionCleaning = b.cleaningNet - b.cleaningPayout;
       const rows = [];
-      rows.push(`<div class="sb-row"><span>Curățenie (${Number(d.sqm) || 0} m²)</span><span>${money(b.cleaningNet)}</span></div>`);
-      rows.push(`<div class="sb-row sur"><span>Comision platformă (${b.pct}%)</span><span>−${money(commissionCleaning)}</span></div>`);
-      if (b.linenTaken && b.linenSets > 0) rows.push(`<div class="sb-row"><span>Lenjerie preluată de tine (${b.linenSets} × ${C.linenSetPriceRon} lei)</span><span>+${money(b.linenPayout)}</span></div>`);
-      if (b.consExecutantPayout > 0) rows.push(`<div class="sb-row"><span>Consumabile — partea ta din adaos (${C.consumableSplit.executant}%)</span><span>+${money(b.consExecutantPayout)}</span></div>`);
+      // Sursa 1 — Curățenie: prețul plătit de client, minus comisionul, = partea ta
+      rows.push(`<div class="sb-row"><span>🧹 Curățenie (${Number(d.sqm) || 0} m²) — client plătește</span><span>${money(b.cleaningNet)}</span></div>`);
+      rows.push(`<div class="sb-row sur"><span>− Comision platformă (${b.pct}%)</span><span>−${money(commissionCleaning)}</span></div>`);
+      rows.push(`<div class="sb-row" style="font-weight:700;border-top:1px dashed var(--h-line);padding-top:8px"><span>= Curățenie, partea ta (${cleanPct}%)</span><span>${money(b.cleaningPayout)}</span></div>`);
+      // Sursa 2 — Lenjerie (dacă o preiei tu)
+      if (b.linenTaken && b.linenSets > 0) rows.push(`<div class="sb-row"><span>+ 🧺 Lenjerie preluată (${b.linenSets} × ${C.linenSetPriceRon} lei · ${cleanPct}%)</span><span>+${money(b.linenPayout)}</span></div>`);
+      // Sursa 3 — Consumabile (partea ta din adaos)
+      if (b.consExecutantPayout > 0) rows.push(`<div class="sb-row"><span>+ 🧴 Consumabile (${C.consumableSplit.executant}% din adaos)</span><span>+${money(b.consExecutantPayout)}</span></div>`);
       $("#exBreakdown").innerHTML = rows.join("");
       $("#exTotal").innerHTML = `${money(b.payout)} <small style="font-size:14px;color:var(--h-muted);font-weight:600">≈ ${leiOf(b.payout)} lei</small>`;
       const peak = S.isPeak(d.startTime), wh = S.isWeekendOrHoliday(d.date);
@@ -4098,11 +4108,22 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       body.querySelectorAll("#linenMode .role-opt").forEach(x => x.classList.toggle("active", x.dataset.linen === reqLinenMode));
       updateSummary();
     });
-    // urgență: permite alegerea zilei de azi (minim 5h înainte); altfel min = prima zi validă
-    if (form.reqUrgent && form.date) form.reqUrgent.addEventListener("change", () => {
-      if (form.reqUrgent.checked) { form.date.min = today; }
-      else { form.date.min = minBook; if (form.date.value < minBook) form.date.value = minBook; }
-    });
+    // opțiunile Urgență / Rambursabil sunt EXCLUSIVE (nu se cumulează) + urgența permite ziua de azi
+    if (form.reqUrgent && form.reqRefundable) {
+      form.reqUrgent.addEventListener("change", () => {
+        if (form.reqUrgent.checked) form.reqRefundable.checked = false;   // exclusiv
+        if (form.date) {
+          if (form.reqUrgent.checked) { form.date.min = today; }
+          else { form.date.min = minBook; if (form.date.value < minBook) form.date.value = minBook; }
+        }
+      });
+      form.reqRefundable.addEventListener("change", () => {
+        if (form.reqRefundable.checked) {
+          form.reqUrgent.checked = false;   // exclusiv
+          if (form.date) { form.date.min = minBook; if (form.date.value < minBook) form.date.value = minBook; }
+        }
+      });
+    }
     form.addEventListener("input", updateSummary);
     form.addEventListener("change", updateSummary);
     updateSummary();

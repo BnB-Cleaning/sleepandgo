@@ -58,9 +58,9 @@ function priceOfServer(req, st) {
   const consRon = round2(consCostRon + round2(consCostRon * PRICE.consumableMarkupPct / 100));
   const consEur = ronToEur(consRon);
   const baseEur = round2(round2(cleaningNet + linenEur) + consEur);
-  // opțiuni cu suprataxă (aditiv pe baseEur): rambursabil +20%, urgență +30%
-  const refundableAddEur = req.refundable ? round2(baseEur * PRICE.refundableSurchargePct / 100) : 0;
+  // opțiuni cu suprataxă — EXCLUSIVE (nu se cumulează): urgența are prioritate dacă ambele apar
   const urgentAddEur = req.urgent ? round2(baseEur * PRICE.urgentSurchargePct / 100) : 0;
+  const refundableAddEur = (req.refundable && !req.urgent) ? round2(baseEur * PRICE.refundableSurchargePct / 100) : 0;
   const totalEur = round2(baseEur + refundableAddEur + urgentAddEur);
   const totalRon = Math.round(totalEur * ronPerEur);   // lei afișați clientului
   return { totalEur, totalRon, baniRon: totalRon * 100 };
