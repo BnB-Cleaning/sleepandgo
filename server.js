@@ -28,7 +28,7 @@ if (STRIPE_SECRET_KEY) {
 /* Calculul prețului pe SERVER (nu se poate falsifica din client).
    Reproduce priceOf() din js/store.js: bază/m², +30% vârf (10–15), +10% weekend/sărbătoare,
    lenjerie 50 lei/set, consumabile (achiziție + 10% adaos). Întoarce totalul în bani (RON*100). */
-const PRICE = { pricePerSqm: 0.6, linenSetPriceRon: 50, ronPerEur: 4.97, consumableMarkupPct: 10, weekendHolidaySurchargePct: 10, peakStart: 10, peakEnd: 15, peakSurchargePct: 30, refundableSurchargePct: 20, refundRetainPct: 10, refundDeadlineHour: 9, urgentSurchargePct: 30 };
+const PRICE = { pricePerSqm: 0.6, linenSetPriceRon: 50, ronPerEur: 4.97, consumableMarkupPct: 10, weekendHolidaySurchargePct: 10, peakStart: 10, peakEnd: 15, peakSurchargePct: 30, refundableSurchargePct: 20, refundRetainPct: 10, refundDeadlineHour: 9, urgentSurchargePct: 40 };
 const LEGAL_HOLIDAYS = ["01-01", "01-02", "01-24", "05-01", "06-01", "08-15", "11-30", "12-01", "12-25", "12-26"];
 const round2 = (n) => Math.round(n * 100) / 100;
 function priceOfServer(req, st) {
