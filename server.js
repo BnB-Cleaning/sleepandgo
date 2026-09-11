@@ -28,7 +28,7 @@ if (STRIPE_SECRET_KEY) {
 /* Calculul prețului pe SERVER (nu se poate falsifica din client).
    Reproduce priceOf() din js/store.js: bază/m², +30% vârf (10–15), +10% weekend/sărbătoare,
    lenjerie 50 lei/set, consumabile (achiziție + 10% adaos). Întoarce totalul în bani (RON*100). */
-const PRICE = { pricePerSqm: 0.6, linenSetPriceRon: 50, ronPerEur: 4.97, consumableMarkupPct: 10, weekendHolidaySurchargePct: 10, peakStart: 10, peakEnd: 15, peakSurchargePct: 30 };
+const PRICE = { pricePerSqm: 0.6, linenSetPriceRon: 50, ronPerEur: 4.97, consumableMarkupPct: 10, weekendHolidaySurchargePct: 10, peakStart: 10, peakEnd: 15, peakSurchargePct: 30, refundableSurchargePct: 20, refundRetainPct: 10, refundDeadlineHour: 9, urgentSurchargePct: 30 };
 const LEGAL_HOLIDAYS = ["01-01", "01-02", "01-24", "05-01", "06-01", "08-15", "11-30", "12-01", "12-25", "12-26"];
 const round2 = (n) => Math.round(n * 100) / 100;
 function priceOfServer(req, st) {
@@ -57,7 +57,11 @@ function priceOfServer(req, st) {
   }, 0);
   const consRon = round2(consCostRon + round2(consCostRon * PRICE.consumableMarkupPct / 100));
   const consEur = ronToEur(consRon);
-  const totalEur = round2(round2(cleaningNet + linenEur) + consEur);
+  const baseEur = round2(round2(cleaningNet + linenEur) + consEur);
+  // opțiuni cu suprataxă (aditiv pe baseEur): rambursabil +20%, urgență +30%
+  const refundableAddEur = req.refundable ? round2(baseEur * PRICE.refundableSurchargePct / 100) : 0;
+  const urgentAddEur = req.urgent ? round2(baseEur * PRICE.urgentSurchargePct / 100) : 0;
+  const totalEur = round2(baseEur + refundableAddEur + urgentAddEur);
   const totalRon = Math.round(totalEur * ronPerEur);   // lei afișați clientului
   return { totalEur, totalRon, baniRon: totalRon * 100 };
 }
@@ -403,6 +407,55 @@ app.get("/api/pay/verify", async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
+// --- Rambursare (opțiune rambursabilă): 90% înapoi, 10% reținut ---
+app.post("/api/pay/refund", async (req, res) => {
+  try {
+    const uid = readSession(req);
+    if (!uid) return res.status(401).json({ ok: false, error: "Neautentificat." });
+    const reqId = req.body && req.body.reqId;
+    const st = await getState();
+    const r = (st.requests || []).find(x => x.id === reqId);
+    if (!r) return res.status(404).json({ ok: false, error: "Solicitare inexistentă." });
+    if (r.requesterId !== uid) return res.status(403).json({ ok: false, error: "Nu este solicitarea ta." });
+    // eligibilitate
+    if (!r.refundable) return res.json({ ok: false, error: "Solicitarea nu are opțiunea rambursabilă." });
+    if (r.refundedAt) return res.json({ ok: false, error: "Solicitarea a fost deja rambursată." });
+    if (!["platit", "acceptat"].includes(r.status))
+      return res.json({ ok: false, error: "Rambursarea nu mai e posibilă (lucrarea a început sau e finalizată)." });
+    // termen: ora 9:00 în ziua curățeniei (parsare naivă — backstop; gate-ul principal e în client, pe fusul RO)
+    const dl = new Date((r.date || "") + "T" + String(PRICE.refundDeadlineHour).padStart(2, "0") + ":00:00");
+    if (!(isFinite(dl.getTime()) && Date.now() < dl.getTime()))
+      return res.json({ ok: false, error: `Termenul de rambursare (ora ${PRICE.refundDeadlineHour}:00 în ziua curățeniei) a trecut.` });
+
+    const price = priceOfServer(r, st);
+    const refundBani = Math.round(price.baniRon * (100 - PRICE.refundRetainPct) / 100);
+    const ronPerEur = (st.settings && st.settings.ronPerEur > 0) ? st.settings.ronPerEur : PRICE.ronPerEur;
+    const refundEur = round2((refundBani / 100) / ronPerEur);
+    const retainedEur = round2(price.totalEur - refundEur);
+
+    // refund real în Stripe (90%), dacă avem sesiunea de plată
+    if (stripe && r.stripeSessionId) {
+      try {
+        const sess = await stripe.checkout.sessions.retrieve(String(r.stripeSessionId));
+        const pi = sess && sess.payment_intent;
+        if (pi) await stripe.refunds.create({ payment_intent: String(pi), amount: refundBani });
+      } catch (e) {
+        return res.status(502).json({ ok: false, error: "Rambursarea Stripe a eșuat: " + String(e.message || e) });
+      }
+    }
+
+    // actualizează starea
+    r.status = "anulat";
+    r.refundedAt = Date.now();
+    r.refundEur = refundEur;
+    r.refundRetainedEur = retainedEur;
+    r.refundRetainPct = PRICE.refundRetainPct;
+    await saveState(st);
+    console.log("[stripe] rambursare:", reqId, refundBani, "bani");
+    res.json({ ok: true, refundEur, retainedEur });
+  } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
+});
+
 // --- Lead-uri publice (ofertă din simulator / închiriere lenjerii) — fără autentificare ---
 app.post("/api/lead", async (req, res) => {
   try {
@@ -444,6 +497,7 @@ app.get("/sitemap.xml", async (req, res) => {
       { loc: "/", pr: "1.0", cf: "weekly" },
       { loc: "/agenti-cleaning", pr: "0.8", cf: "monthly" },
       { loc: "/serviciu-lenjerie", pr: "0.8", cf: "monthly" },
+      { loc: "/inchiriere-lenjerii", pr: "0.7", cf: "monthly" },
       { loc: "/blog", pr: "0.7", cf: "weekly" },
       { loc: "/despre-noi", pr: "0.5", cf: "yearly" },
       { loc: "/termeni-si-conditii", pr: "0.3", cf: "yearly" },
