@@ -4220,55 +4220,159 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
 
   function renderTermeni() {
     const azi = new Date().toLocaleDateString("ro-RO", { day: "numeric", month: "long", year: "numeric" });
+    const pct = S.commissionPct();            // comision platformă (%)
+    const cleanPct = 100 - pct;               // partea prestatorului
+    const vip = S.vipConfig();
+    const csp = C.consumableSplit;
+    const base = S.pricePerSqm();
+    const lo = C.launchOffer || {};
     renderStaticPage(
       "Termeni și condiții — Sleep & Go Cleaning",
-      "Termenii și condițiile de utilizare a platformei Sleep & Go Cleaning (curățenie regim hotelier), administrată de SC GlobalApps SRL.",
+      "Termeni și condiții Sleep & Go Cleaning: cum funcționează platforma, comisionarea pentru solicitant, Agent Cleaning, serviciu de lenjerie și platformă, plăți, garanție, VIP și recomandări.",
       "/termeni-si-conditii",
       `<h1>Termeni și condiții</h1>
-      <p class="ba-lead">Condițiile de utilizare a platformei Sleep &amp; Go Cleaning. Prin crearea unui cont și utilizarea platformei, ești de acord cu acești termeni.</p>
+      <p class="ba-lead">Condițiile de utilizare a platformei Sleep &amp; Go Cleaning. Prin crearea unui cont și utilizarea platformei, ești de acord cu acești termeni. Documentul detaliază modul de <strong>comisionare pentru fiecare parte</strong> și toate modalitățile de funcționare.</p>
       <div class="ba-body">
         <p><em>Ultima actualizare: ${azi}</em></p>
 
         <h2>1. Operatorul platformei</h2>
-        <p>Platforma <strong>Sleep &amp; Go Cleaning</strong> (denumită în continuare „Platforma") este administrată, operată și facturată de <strong>S.C. GlobalApps S.R.L.</strong>, CUI 35751892, Reg. Com. J40/3223/2016 (denumită în continuare „Operatorul").</p>
+        <p>Platforma <strong>Sleep &amp; Go Cleaning</strong> („Platforma") este administrată, operată și facturată de <strong>S.C. GlobalApps S.R.L.</strong>, CUI 35751892, Reg. Com. J40/3223/2016 („Operatorul" / „Platforma").</p>
 
         <h2>2. Definiții</h2>
         <ul>
-          <li><strong>Solicitant</strong> — proprietarul unei locații în regim hotelier care solicită servicii prin Platformă.</li>
-          <li><strong>Agent Cleaning</strong> — prestatorul de servicii de curățenie (PFA / PFI / SRL) înscris pe Platformă.</li>
-          <li><strong>Serviciu de lenjerie</strong> — prestatorul care preia, spală și returnează lenjeria.</li>
-          <li><strong>Solicitare</strong> — o comandă de servicii plasată prin Platformă.</li>
+          <li><strong>Solicitant</strong> — proprietarul unei locații în regim hotelier care comandă servicii prin Platformă.</li>
+          <li><strong>Agent Cleaning</strong> — prestatorul de curățenie (PFA / PFI / SRL) înscris pe Platformă.</li>
+          <li><strong>Serviciu de lenjerie</strong> — prestatorul care preia, spală, calcă și returnează lenjeria și distribuie consumabile.</li>
+          <li><strong>Administrator</strong> — Operatorul, care coordonează platforma, aprobă locațiile, gestionează plățile și comisionul.</li>
+          <li><strong>Solicitare</strong> — o comandă de servicii plasată și plătită în avans prin Platformă.</li>
+          <li><strong>Comision</strong> — procentul reținut de Platformă din valoarea serviciilor (implicit <strong>${pct}%</strong>).</li>
+          <li><strong>VIP Member</strong> — abonament lunar opțional al Solicitantului, cu reduceri.</li>
         </ul>
 
-        <h2>3. Serviciile platformei</h2>
-        <p>Platforma facilitează intermedierea între Solicitanți și prestatori (Agenți Cleaning, Serviciu de lenjerie) pentru servicii de curățenie în regim hotelier. Operatorul nu prestează direct serviciile de curățenie, ci pune la dispoziție infrastructura de programare, plată și evaluare.</p>
-
-        <h2>4. Conturi și eligibilitate</h2>
-        <p>Pentru a folosi Platforma trebuie să creezi un cont cu date reale și complete. Prestatorii trebuie să fie entități legale (PFA / PFI / SRL) și să respecte legislația aplicabilă. Ești responsabil pentru confidențialitatea datelor de autentificare.</p>
-
-        <h2>5. Prețuri, plăți și rambursări</h2>
+        <h2>3. Cum funcționează platforma</h2>
+        <p>Platforma intermediază între Solicitanți și prestatori. Operatorul nu prestează direct serviciile, ci pune la dispoziție infrastructura de programare, plată în avans, notificare, evaluare și garantare.</p>
         <ul>
-          <li>Prețul este afișat transparent înainte de plasarea solicitării și se achită în avans, securizat, prin procesatorul de plăți.</li>
-          <li>Operatorul reține un comision din valoarea fiecărei tranzacții, comunicat în platformă.</li>
-          <li><strong>Garanție:</strong> dacă lucrarea nu este efectuată în intervalul orar rezervat, Solicitantul primește rambursarea integrală pentru acea solicitare, plus compensația prevăzută în platformă.</li>
+          <li><strong>Solicitantul</strong> adaugă locația (cu document de suprafață validat de Administrator), programează o curățenie, plătește în avans și alege Agentul Cleaning dintre cei înscriși, după rating.</li>
+          <li><strong>Agentul Cleaning</strong> vede solicitările plătite din zona sa, se înscrie, execută lucrarea în intervalul rezervat și încasează automat după finalizare.</li>
+          <li><strong>Serviciul de lenjerie</strong> preia lenjeria (când Agentul Cleaning nu o spală) sau rute întregi, o procesează și o returnează; distribuie consumabile.</li>
         </ul>
 
-        <h2>6. Obligațiile utilizatorilor</h2>
-        <p>Solicitantul furnizează informații corecte despre locație (inclusiv suprafața) și accesul necesar. Prestatorii execută serviciile la standardul convenit, în intervalul rezervat, și respectă spațiile și bunurile din locație. Agenții Cleaning și Serviciile de lenjerie pot depune o garanție (cec) conform contractului propriu generat în platformă.</p>
+        <h2>4. Prețul serviciilor — cum se calculează</h2>
+        <p>Prețul este afișat <strong>transparent, integral, înainte de plată</strong>. Componente:</p>
+        <ul>
+          <li><strong>Curățenie:</strong> preț de bază de la <strong>${base} €/m²</strong> × suprafața din documentul aprobat.</li>
+          <li><strong>Interval de vârf</strong> (${C.schedule.peakStart}:00–${C.schedule.peakEnd}:00): <strong>+${C.schedule.peakSurchargePct}%</strong> la curățenie.</li>
+          <li><strong>Weekend / sărbători legale:</strong> <strong>+${C.weekendHolidaySurchargePct}%</strong> la curățenie.</li>
+          <li><strong>Lenjerie:</strong> ${C.linenSetPriceRon} lei/set (spălat &amp; călcat), opțional.</li>
+          <li><strong>Consumabile:</strong> preț de achiziție + <strong>${C.consumableMarkupPct}%</strong> adaos, opțional.</li>
+          <li><strong>Opțiuni:</strong> ⚡ Urgență <strong>+${C.urgentSurchargePct}%</strong> · 🔓 Rambursabil <strong>+${C.refundableSurchargePct}%</strong> (vezi secțiunea 6).</li>
+        </ul>
 
-        <h2>7. Recenzii</h2>
-        <p>Recenziile trebuie să fie oneste și bazate pe experiența reală. Operatorul poate elimina recenziile abuzive, false sau care încalcă legea.</p>
+        <h2>5. Comisionare — detaliat, pe fiecare parte</h2>
+        <p>Platforma reține un comision de <strong>${pct}%</strong> din serviciile intermediate. Mai jos, cine primește ce, pentru fiecare speță:</p>
 
-        <h2>8. Limitarea răspunderii</h2>
+        <h3>5.1. Solicitantul (clientul)</h3>
+        <ul>
+          <li>Plătește <strong>în avans</strong> prețul total afișat (curățenie + eventual lenjerie, consumabile, opțiuni).</li>
+          <li>Nu plătește comision separat — comisionul Platformei este deja inclus în preț.</li>
+          <li>Beneficiază de garanție, notificări și de posibilitatea de a alege prestatorul.</li>
+        </ul>
+
+        <h3>5.2. Agentul Cleaning (executantul)</h3>
+        <ul>
+          <li><strong>Curățenie:</strong> primește <strong>${cleanPct}%</strong> din prețul curățeniei; Platforma reține ${pct}%.</li>
+          <li><strong>Adaosurile</strong> de vârf (+${C.schedule.peakSurchargePct}%) și weekend/sărbători (+${C.weekendHolidaySurchargePct}%) se aplică la curățenie, deci cresc și partea Agentului.</li>
+          <li><strong>Lenjerie</strong> (dacă o spală el): <strong>${cleanPct}%</strong> din tariful de lenjerie (${C.linenSetPriceRon} lei/set); Platforma ${pct}%.</li>
+          <li><strong>Consumabile:</strong> își recuperează achiziția + <strong>${csp.executant}%</strong> din adaos, pentru produsele puse în locație.</li>
+          <li><strong>Prime opțiuni</strong> (⚡ urgență / 🔓 rambursabil): primește <strong>${cleanPct}%</strong> din primă; Platforma ${pct}%.</li>
+          <li>Încasează <strong>automat după finalizare</strong> (marchează „gata pentru oaspeți"). Plata e garantată în avans.</li>
+        </ul>
+
+        <h3>5.3. Serviciul de lenjerie</h3>
+        <ul>
+          <li><strong>Spălare lenjerie:</strong> <strong>${cleanPct}%</strong> din tariful de lenjerie (${C.linenSetPriceRon} lei/set); Platforma ${pct}%.</li>
+          <li><strong>Consumabile distribuite:</strong> își recuperează achiziția + <strong>${csp.laundry}%</strong> din adaos.</li>
+          <li><strong>Lenjerie închiriată:</strong> primește ${cleanPct}% din spălarea ei; taxa de închiriere rămâne integral la Platformă.</li>
+        </ul>
+
+        <h3>5.4. Platforma (Operatorul)</h3>
+        <ul>
+          <li>Reține <strong>${pct}%</strong> comision din curățenie, lenjerie și primele de opțiuni.</li>
+          <li>Reține <strong>${csp.admin}%</strong> din adaosul pe consumabile (restul: achiziția rambursată + ${csp.executant}% Agent + ${csp.laundry}% Serviciul de lenjerie).</li>
+          <li><strong>Suportă reducerile</strong> acordate clienților (ofertă de lansare și VIP) — acestea se scad din comisionul Platformei, <em>nu</em> din plata prestatorilor.</li>
+          <li>Asigură procesarea plăților, garanția, notificările și mentenanța platformei.</li>
+        </ul>
+        <p class="hint" style="font-size:14px"><em>Exemplu: la o curățenie de 100 lei, Agentul Cleaning primește ${cleanPct} lei, iar Platforma reține ${pct} lei. Adaosurile de vârf/weekend și primele de opțiuni se împart în aceeași proporție ${cleanPct}/${pct}.</em></p>
+
+        <h2>6. Opțiuni de solicitare</h2>
+        <ul>
+          <li><strong>Standard</strong> — se trimite până la ora <strong>${C.bookingLeadHour}:00 cu ${(C.bookingLeadDays || 1) === 1 ? "o zi" : C.bookingLeadDays + " zile"} înainte</strong> de data dorită.</li>
+          <li><strong>⚡ Urgență (+${C.urgentSurchargePct}%)</strong> — se poate plasa cu minim <strong>${C.urgentMinLeadHours} ore</strong> înainte de ora de începere, în programul de lucru.</li>
+          <li><strong>🔓 Rambursabil (+${C.refundableSurchargePct}%)</strong> — poți anula și primești <strong>${100 - C.refundRetainPct}% înapoi</strong> (se reține ${C.refundRetainPct}%), până la ora <strong>${C.refundDeadlineHour}:00</strong> în ziua curățeniei. Opțiunile ⚡ și 🔓 nu se cumulează.</li>
+        </ul>
+
+        <h2>7. Program și reguli de programare</h2>
+        <p>Programul de lucru este <strong>${C.schedule.open}:00–${C.schedule.close}:00</strong>, cu interval minim de ${C.schedule.minHours} ore per lucrare. Solicitările fără opțiunea de urgență respectă termenul de la secțiunea 6.</p>
+
+        <h2>8. Modalități de plată</h2>
+        <ul>
+          <li><strong>Card, în avans</strong>, securizat prin Stripe. Suma e reținută înainte ca lucrarea să fie vizibilă prestatorilor.</li>
+          <li><strong>Credit din recomandări:</strong> Solicitantul poate folosi soldul din programul de recomandare pentru a plăti (parțial sau integral) o solicitare (vezi secțiunea 11).</li>
+          <li>Plățile către prestatori se eliberează <strong>după finalizarea</strong> lucrării.</li>
+        </ul>
+
+        <h2>9. Ofertă de lansare</h2>
+        <p>Primele <strong>${lo.maxActions} curățenii</strong> de pe platformă beneficiază de <strong>−${lo.discountPct}%</strong> la curățenie. Reducerea este <strong>suportată integral din comisionul Platformei</strong>; plata Agentului Cleaning rămâne neschimbată. Oferta este valabilă în limita disponibilității și poate fi modificată sau oprită de Operator.</p>
+
+        <h2>10. Abonament VIP Member</h2>
+        <ul>
+          <li>Abonament lunar opțional pentru Solicitanți: <strong>${vip.baseRon} lei/lună</strong> pentru prima locație + <strong>${vip.extraRon} lei/lună</strong> pentru fiecare locație suplimentară înscrisă.</li>
+          <li>Se încasează <strong>în avans</strong>, prin Stripe, pentru ${vip.periodDays} de zile.</li>
+          <li>Beneficiu: <strong>−${vip.discountPct}%</strong> la fiecare solicitare, <strong>doar pentru locațiile înscrise</strong> în abonament. Solicitantul poate adăuga/scoate locații; prețul se recalculează.</li>
+          <li>Reducerea VIP este suportată din comisionul Platformei. Reducerea VIP și oferta de lansare nu se cumulează.</li>
+        </ul>
+
+        <h2>11. Program de recomandare</h2>
+        <ul>
+          <li>Orice utilizator poate recomanda pe oricine, cu un link unic. Recompensa: <strong>${S.REF_PCT}% din comisionul Platformei</strong> pentru <strong>primele ${S.REF_CAP} acțiuni</strong> ale fiecărei persoane recomandate (solicitări finalizate / lucrări executate).</li>
+          <li>Câștigurile se plătesc după acumularea a <strong>${S.REF_PAYOUT_EUR} €</strong>, <strong>exclusiv prin virament pe IBAN</strong> (nu în numerar). Utilizatorul își setează IBAN-ul în cont.</li>
+          <li>Solicitantul poate folosi soldul din recomandări și pentru a-și plăti serviciile pe platformă.</li>
+        </ul>
+
+        <h2>12. Garanție</h2>
+        <ul>
+          <li><strong>Pentru Solicitant:</strong> dacă lucrarea <strong>nu este efectuată în intervalul orar rezervat</strong>, primești <strong>rambursarea integrală</strong> pentru acea solicitare, plus <strong>${C.guaranteeBonusRon} lei</strong> compensație.</li>
+          <li><strong>Pentru prestatori:</strong> la înscriere se poate solicita o <strong>garanție returnabilă</strong> care acoperă lenjeria și consumabilele aflate în grija lor; se restituie la încetarea colaborării, conform contractului generat în platformă.</li>
+        </ul>
+
+        <h2>13. Lenjerie</h2>
+        <p>Fiecare set de lenjerie este <strong>etichetat individual</strong>. Proprietarul introduce minim <strong>${C.linenMinSets} seturi</strong> în circuit, care rotesc continuu (locație → spălătorie → depozitare la Agentul Cleaning → locație), astfel încât la fiecare check-in există lenjerie curată. Opțional, lenjeria poate fi <strong>închiriată</strong> de la platformă.</p>
+
+        <h2>14. Notificări</h2>
+        <p>Solicitantul este anunțat prin <strong>email și SMS</strong> când activitatea <strong>începe</strong> și când se <strong>termină</strong> (locația e gata pentru oaspeți).</p>
+
+        <h2>15. Video înainte/după</h2>
+        <p>Agentul Cleaning poate filma un video înainte și după intervenție. Acesta se pune la dispoziția Solicitantului <strong>doar la cererea sa</strong> sau dacă locația este foarte murdară la sosire, fiind util pentru cererile de despăgubire către platformele de închiriere (Airbnb/Booking).</p>
+
+        <h2>16. Anulare și rambursare</h2>
+        <p>Solicitările standard plătite nu se rambursează la anulare, cu excepția cazului în care s-a ales opțiunea <strong>🔓 Rambursabil</strong> (secțiunea 6) sau se aplică <strong>garanția</strong> (secțiunea 12). Rambursările se procesează prin același instrument de plată.</p>
+
+        <h2>17. Obligațiile utilizatorilor</h2>
+        <p>Solicitantul furnizează informații corecte despre locație (inclusiv suprafața) și accesul necesar. Prestatorii execută serviciile la standardul convenit, în intervalul rezervat, și respectă spațiile și bunurile. Conturile trebuie create cu date reale; ești responsabil pentru confidențialitatea datelor de autentificare.</p>
+
+        <h2>18. Recenzii</h2>
+        <p>Recenziile trebuie să fie oneste și bazate pe experiența reală; sunt disponibile Solicitanților cu minim ${C.reviewMinPerMonth} solicitări în luna respectivă. Operatorul poate elimina recenziile abuzive, false sau ilegale.</p>
+
+        <h2>19. Limitarea răspunderii</h2>
         <p>Operatorul acționează ca intermediar și nu răspunde pentru calitatea intrinsecă a serviciilor prestate de terți, dincolo de mecanismele de garanție și evaluare oferite. Răspunderea Operatorului este limitată la valoarea comisionului aferent solicitării în cauză, în limitele permise de lege.</p>
 
-        <h2>9. Protecția datelor (GDPR)</h2>
-        <p>Prelucrăm datele personale conform Regulamentului (UE) 2016/679 (GDPR), doar în scopul funcționării Platformei. Ai dreptul de acces, rectificare, ștergere și portabilitate. Pentru solicitări privind datele tale, contactează Operatorul.</p>
+        <h2>20. Protecția datelor (GDPR)</h2>
+        <p>Prelucrăm datele personale conform Regulamentului (UE) 2016/679 (GDPR), doar în scopul funcționării Platformei (cont, plăți, notificări). Ai dreptul de acces, rectificare, ștergere și portabilitate. Pentru solicitări privind datele tale, contactează Operatorul.</p>
 
-        <h2>10. Modificarea termenilor</h2>
-        <p>Operatorul poate actualiza acești termeni. Modificările intră în vigoare la publicarea pe această pagină. Utilizarea în continuare a Platformei constituie acceptarea termenilor actualizați.</p>
+        <h2>21. Modificarea termenilor</h2>
+        <p>Operatorul poate actualiza acești termeni, comisioanele și tarifele. Modificările intră în vigoare la publicarea pe această pagină. Utilizarea în continuare a Platformei constituie acceptarea termenilor actualizați.</p>
 
-        <h2>11. Contact</h2>
+        <h2>22. Contact</h2>
         <p>Pentru întrebări privind acești termeni: telefon <a href="tel:${PHONE.replace(/\./g, "")}">${PHONE}</a>.</p>
 
         <p><em>Acest document reprezintă un cadru general de utilizare. Pentru conformitate deplină cu specificul afacerii tale, recomandăm revizuirea de către un consultant juridic.</em></p>
