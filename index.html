@@ -804,6 +804,22 @@ body.landing-active { background: var(--h-bg); }
 .vid-ctrl { display: inline-flex; gap: 6px; align-items: center; }
 .btn.btn-sm { padding: 6px 12px; font-size: 13px; }
 
+/* ===== Întrebări frecvente (FAQ landing) ===== */
+.h-faq { max-width: 820px; margin: 0 auto; display: grid; gap: 12px; }
+.faq-item { background: #fff; border: 1px solid #e6ecf3; border-radius: 14px; padding: 0 20px; box-shadow: 0 6px 18px rgba(20, 40, 80, .05); transition: box-shadow .18s ease, border-color .18s ease; }
+.faq-item[open] { border-color: #bfdbfe; box-shadow: 0 10px 26px rgba(20, 40, 80, .09); }
+.faq-item summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 18px 0; font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 16px; color: var(--h-ink); }
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary:focus-visible { outline: 2px solid var(--h-blue); outline-offset: 3px; border-radius: 6px; }
+.faq-q { flex: 1 1 auto; }
+.faq-chev { flex: 0 0 auto; position: relative; width: 22px; height: 22px; border-radius: 999px; background: #eaf6fd; }
+.faq-chev::before, .faq-chev::after { content: ""; position: absolute; top: 50%; left: 50%; width: 11px; height: 2px; background: var(--h-blue); border-radius: 2px; transform: translate(-50%, -50%); transition: opacity .2s ease, transform .2s ease; }
+.faq-chev::after { transform: translate(-50%, -50%) rotate(90deg); }
+.faq-item[open] .faq-chev::after { opacity: 0; }
+.faq-a { padding: 0 0 20px; color: #33414f; font-size: 15px; line-height: 1.7; }
+.faq-a strong { color: var(--h-ink); font-weight: 700; }
+@media (max-width: 560px) { .faq-item summary { font-size: 15px; } .faq-a { font-size: 14.5px; } }
+
 </style>
 
   <header class="topbar" id="topbar" hidden>
@@ -2734,6 +2750,18 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       ["🧻", "Alimentare consumabile", "Hârtie igienică, apă, cafea, bomboane și produse de curățenie — reaprovizionare la fiecare intervenție."],
       ["📊", "Indici de consum", "Citim și transmitem indicii de apă, curent și gaz către furnizori, pe bază de cerere standard."],
     ];
+    const homeFaq = [
+      { q: "Cât costă o curățenie și cum se calculează prețul?", a: `Prețul pornește de la <strong>${offPeak} €/m²</strong> (≈ ${leiOf(offPeak)} lei) în afara orelor de vârf, aplicat la suprafața din documentul aprobat de administrator. În intervalul de vârf ${C.schedule.peakStart}:00–${C.schedule.peakEnd}:00 se adaugă <strong>+${C.schedule.peakSurchargePct}%</strong>, iar în weekend și de sărbătorile legale <strong>+${C.weekendHolidaySurchargePct}%</strong>. Opțional adaugi lenjerie (${C.linenSetPriceRon} lei/set) și consumabile (preț de achiziție + ${C.consumableMarkupPct}% adaos). Vezi totalul exact în simulator, înainte să plătești — fără costuri ascunse.` },
+      { q: "Când și cum plătesc?", a: `Plătești integral <strong>în avans</strong>, securizat cu cardul prin Stripe, în momentul trimiterii solicitării. Abia după plată solicitarea devine vizibilă Agenților Cleaning din zona ta.` },
+      { q: "Până când pot trimite o solicitare?", a: `Pentru o anumită dată, solicitarea standard se trimite până la ora <strong>${C.bookingLeadHour}:00 cu o zi înainte</strong>. Dacă ai nevoie mai repede, folosești opțiunea <strong>⚡ Urgență</strong> și poți rezerva cu minim ${C.urgentMinLeadHours} ore înainte de ora de începere (+${C.urgentSurchargePct}%). Programul de lucru este ${C.schedule.open}:00–${C.schedule.close}:00.` },
+      { q: "Pot anula și primi banii înapoi?", a: `Doar dacă ai ales opțiunea <strong>🔓 Rambursabil</strong> (+${C.refundableSurchargePct}%). Atunci poți cere rambursarea până la ora <strong>${C.refundDeadlineHour}:00 în ziua curățeniei</strong> și primești <strong>90% înapoi</strong> (se reține ${C.refundRetainPct}%). Fără această opțiune, solicitările plătite nu se rambursează la anulare.` },
+      { q: "Ce garanție am că se face la timp?", a: `Garanția Sleep &amp; Go: dacă curățenia <strong>nu este efectuată în intervalul orar rezervat</strong>, primești <strong>toți banii înapoi</strong> pentru acea solicitare, <strong>plus ${C.guaranteeBonusRon} lei</strong> compensație pentru deranj.` },
+      { q: "Cine face curățenia și cum îl aleg?", a: `După plată, Agenții Cleaning din zona ta se înscriu la solicitarea ta, iar <strong>tu îl alegi</strong> pe cel dorit, în funcție de rating și recenzii. Toți sunt entități juridice verificate (PFA/PFI/SRL).` },
+      { q: "Cum sunt anunțat despre stadiul lucrării?", a: `Primești notificări prin <strong>email și SMS</strong> când Agentul Cleaning <strong>începe</strong> activitatea și când o <strong>termină</strong> (locația e gata pentru oaspeți). Nu trebuie să suni pe nimeni.` },
+      { q: "Cum funcționează lenjeria?", a: `Îți <strong>etichetăm individual</strong> fiecare set, ca să nu se încurce cu ale altcuiva. Introduci minim ${C.linenMinSets} seturi în circuit, care rotesc continuu: în locație → la spălătorie → depozitate la Agentul Cleaning → înapoi în locație, așa încât la fiecare check-in există lenjerie curată pregătită. Un set = plic, cearșaf, 2 fețe de pernă, 2 prosoape, 1 prosop de baie.` },
+      { q: "Se poate filma locația înainte și după?", a: `Da. Agentul Cleaning poate filma un video <strong>înainte</strong> și <strong>după</strong> intervenție. Îl primești doar dacă îl <strong>ceri tu</strong> sau dacă locația e <strong>foarte murdară</strong> la sosire — dovada utilă pentru cererile de despăgubire către Airbnb/Booking.` },
+      { q: "În ce zone lucrați?", a: `București (toate sectoarele + Centrul Vechi) și localitățile limitrofe din Ilfov. Adaugi locația, iar dacă există un Agent Cleaning activ în zonă, poți trimite solicitarea imediat.` },
+    ];
     app.appendChild(el(`
       <div class="home">
         <!-- Utility bar -->
@@ -2981,6 +3009,9 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
           <p class="hint" style="text-align:center;margin-top:20px;color:var(--h-muted)">⏰ Solicitările pentru o dată se trimit până la ora 21:00 cu o zi înainte · ⚡ urgență: cu minim ${C.urgentMinLeadHours}h înainte.</p>
         </div></section>
 
+        <!-- Întrebări frecvente -->
+        ${faqSection("Întrebări frecvente", "Ce vor să știe proprietarii", "Răspunsuri clare despre prețuri, plată, garanție și cum decurge o curățenie în regim hotelier.", homeFaq, { soft: true })}
+
         <!-- CTA band -->
         <section class="h-section"><div class="wrap">
           <div class="h-cta-band">
@@ -3006,6 +3037,7 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
               <a data-scroll="servicii">Servicii</a>
               <a data-scroll="cum">Cum funcționează</a>
               <a data-scroll="preturi">Prețuri</a>
+              <a data-scroll="faq">Întrebări frecvente</a>
             </div>
             <div>
               <h4>Explorează</h4>
@@ -3287,6 +3319,36 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     setMeta("property", "og:locale", "ro_RO");
   }
 
+  // Secțiune „Întrebări frecvente" (acordeon) + schema FAQPage (JSON-LD) pentru SEO/AEO/GEO.
+  // items: [{q, a}] — răspunsul (a) poate conține HTML; în schema se folosește textul curat.
+  function faqSection(eyebrow, heading, intro, items, opts) {
+    opts = opts || {};
+    try {
+      setJsonLd("ldFaq", {
+        "@context": "https://schema.org", "@type": "FAQPage",
+        mainEntity: (items || []).map(f => ({
+          "@type": "Question", name: f.q,
+          acceptedAnswer: { "@type": "Answer", text: String(f.a).replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim() },
+        })),
+      });
+    } catch (e) {}
+    return `
+      <section class="h-section${opts.soft ? " soft" : ""} h-faq-sec" id="faq"><div class="wrap">
+        <div class="h-section-head">
+          <div class="eyebrow">❓ ${eyebrow}</div>
+          <h2>${heading}</h2>
+          ${intro ? `<p>${intro}</p>` : ""}
+        </div>
+        <div class="h-faq">
+          ${(items || []).map((f, i) => `
+            <details class="faq-item"${i === 0 ? " open" : ""}>
+              <summary><span class="faq-q">${f.q}</span><span class="faq-chev" aria-hidden="true"></span></summary>
+              <div class="faq-a">${f.a}</div>
+            </details>`).join("")}
+        </div>
+      </div></section>`;
+  }
+
   function renderBlogList() {
     topbar.hidden = true;
     document.body.classList.add("landing-active");
@@ -3498,6 +3560,14 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     document.body.classList.add("landing-active");
     applyBasicSeo("Închiriere lenjerii regim hotelier | " + SITE_NAME, "Închiriază lenjerie pentru regim hotelier (Airbnb, Booking): ți-o aducem, o ridicăm după check-out, o spălăm și o returnăm. Fără investiție în lenjerie proprie — completează formularul și te contactăm.", "/inchiriere-lenjerii");
     app.innerHTML = "";
+    const rentalFaq = [
+      { q: "Cum funcționează închirierea de lenjerie?", a: `Nu cumperi lenjerie proprie — o <strong>închiriezi</strong> de la noi. Serviciul de lenjerie ți-o aduce, o ridică după check-out, o spală și o returnează curată, la timp pentru următorul check-in. Tu nu te ocupi de nimic.` },
+      { q: "Cât costă și care sunt tarifele?", a: `Momentan suntem în etapa de <strong>înregistrări</strong>. Completezi formularul, iar noi te contactăm cu tarifele și detaliile adaptate zonei și numărului de lenjerii de care ai nevoie.` },
+      { q: "Ce conține un set de lenjerie?", a: `Un set include <strong>plic, cearșaf, 2 fețe de pernă, 2 prosoape și 1 prosop de baie</strong>. Fiecare set este etichetat individual, ca să nu se încurce cu ale altcuiva.` },
+      { q: "În ce zone livrați?", a: `În <strong>București și localitățile limitrofe din Ilfov</strong>. Ne spui zona în formular, iar noi confirmăm disponibilitatea la contact.` },
+      { q: "Ce se întâmplă cu lenjeria murdară după check-out?", a: `Serviciul de lenjerie o <strong>ridică, o spală și o calcă</strong>, apoi o readuce curată — circuitul se repetă la fiecare check-in, fără efort din partea ta.` },
+      { q: "Trebuie să am cont ca să mă înregistrez?", a: `Nu. Completezi <strong>formularul</strong> de pe această pagină cu numele, telefonul și numărul de lenjerii, iar noi te contactăm.` },
+    ];
     app.appendChild(el(`
       <div class="home">
         ${blogChromeStart()}
@@ -3532,6 +3602,7 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
             </div>
           </div>
         </div></section>
+        ${faqSection("Întrebări frecvente", "Despre închirierea de lenjerie", "Cum decurge serviciul de închiriere, ce conține un set și cum te înregistrezi.", rentalFaq, { soft: true })}
         ${blogChromeEnd()}
       </div>
     `));
@@ -3560,6 +3631,17 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       ["Vezi solicitările", "Primești solicitările plătite din zona ta. Te înscrii la cele care ți se potrivesc."],
       ["Clientul te alege", "Dintre Agenții Cleaning înscriși, clientul te alege pe tine — după rating și recenzii."],
       ["Faci curățenia & încasezi", "Pregătești locația, anunți «gata pentru oaspeți», iar plata se eliberează automat."],
+    ];
+    const exFaq = [
+      { q: "Cine se poate înscrie ca Agent Cleaning?", a: `Orice entitate juridică — <strong>PFA, PFI sau SRL</strong> — cu CUI/CIF și IBAN pentru încasări. Alegi o zonă de activitate (București sau localitățile limitrofe) și preiei solicitări de acolo.` },
+      { q: "Cât câștig?", a: `Primești <strong>${cleanPct}%</strong> din prețul curățeniei (platforma reține ${S.commissionPct()}%). Dacă speli tu lenjeria, primești <strong>${100 - S.commissionPct()}%</strong> din tariful de lenjerie (${C.linenSetPriceRon} lei/set). La consumabile îți recuperezi achiziția + ${C.consumableSplit.executant}% din adaos. Adaosurile de vârf (+${C.schedule.peakSurchargePct}%) și weekend/sărbători (+${C.weekendHolidaySurchargePct}%) îți cresc și ție partea.` },
+      { q: "Când și cum sunt plătit?", a: `Clientul plătește <strong>în avans</strong>, deci banii sunt garantați înainte să începi. Încasezi <strong>automat după ce marchezi lucrarea finalizată</strong> („locația e gata pentru oaspeți"). Fără facturi neîncasate.` },
+      { q: "Cum primesc lucrări?", a: `Vezi doar solicitările <strong>plătite</strong> din zona ta. Te înscrii la cele care ți se potrivesc, iar <strong>clientul te alege</strong> dintre cei înscriși, după rating și recenzii. Tu decizi ce preiei și când.` },
+      { q: "Ce câștig dacă clientul alege urgență sau rambursabil?", a: `Când clientul alege <strong>⚡ Urgență</strong> (+${C.urgentSurchargePct}%) sau <strong>🔓 Rambursabil</strong> (+${C.refundableSurchargePct}%), primești și tu <strong>partea ta din primă</strong>; doar comisionul standard de ${S.commissionPct()}% rămâne la platformă.` },
+      { q: "Trebuie să mă ocup și de lenjerie?", a: `Nu obligatoriu. Poți <strong>spăla tu lenjeria</strong> (și câștigi ${100 - S.commissionPct()}% din tarif) sau o lași <strong>Serviciului de lenjerie</strong> din zona ta. Lenjeria curată o depozitezi între intervenții, ca la fiecare check-in să existe un set pregătit.` },
+      { q: "Ce e cu garanția și consumabilele?", a: `La înscriere depui o <strong>garanție returnabilă</strong> care acoperă lenjeria și consumabilele aflate în grija ta; se restituie integral la încetarea colaborării. Pentru consumabile blochezi un buget, le depozitezi și îți recuperezi achiziția + ${C.consumableSplit.executant}% din adaos din plata clientului.` },
+      { q: "La ce folosește butonul video înainte/după?", a: `Poți filma un video <strong>înainte</strong> și <strong>după</strong> curățenie. Se trimite clientului doar la cererea lui sau dacă locația e <strong>foarte murdară</strong> la sosire — dovada necesară pentru cererile de despăgubire către Airbnb/Booking.` },
+      { q: "Trebuie să caut clienți?", a: `Nu. Proprietarii postează solicitări plătite, tu te înscrii, ei te aleg. <strong>Fără prospectare</strong> și fără drumuri inutile — lucrezi doar în zona ta.` },
     ];
     app.appendChild(el(`
       <div class="home">
@@ -3697,6 +3779,8 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
           </div>
         </div></section>
 
+        ${faqSection("Întrebări frecvente", "Ce întreabă Agenții Cleaning", "Tot ce vrei să știi despre câștiguri, plată și cum preiei lucrări în zona ta.", exFaq, { soft: false })}
+
         <section class="h-section"><div class="wrap">
           <div class="h-cta-band">
             <h2>Începe să câștigi din curățenie regim hotelier</h2>
@@ -3711,7 +3795,7 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         <footer class="h-footer"><div class="wrap">
           <div class="cols">
             <div><div class="foot-logo"><span>🧽</span> Sleep &amp; Go Cleaning</div><p>Câștigă din curățenie profesională în regim hotelier.</p><p>📞 ${PHONE}</p></div>
-            <div><h4>Agenți Cleaning</h4><a data-scroll="ex-castig">Cât câștigi</a><a data-scroll="ex-nevoie">Condiții</a><a data-scroll="ex-cum">Cum începi</a></div>
+            <div><h4>Agenți Cleaning</h4><a data-scroll="ex-castig">Cât câștigi</a><a data-scroll="ex-nevoie">Condiții</a><a data-scroll="ex-cum">Cum începi</a><a data-scroll="faq">Întrebări frecvente</a></div>
             <div><h4>Cont</h4><a data-reg="executant">Înscrie-te</a><a data-view="spalatorie">Serviciu de lenjerie →</a><a data-go="login">Autentificare</a><a data-home>← Pagina principală</a></div>
           </div>
           <div class="copyright">© 2026 Sleep &amp; Go Cleaning. Toate drepturile rezervate.</div>
@@ -3811,6 +3895,16 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       ["Preiei lenjeria", "Ridici seturile refuzate de Agenți Cleaning sau din locații, plus lenjeria de închiriat."],
       ["Speli, calci, returnezi", "Procesezi și aduci înapoi lenjeria curată și igienizată, la timp pentru oaspeți."],
       ["Încasezi", `Primești ${linenPct}% din spălare + ${C.consumableSplit.laundry}% din adaosul pe consumabile, automat.`],
+    ];
+    const laFaq = [
+      { q: "Cine se poate înscrie ca serviciu de lenjerie?", a: `<strong>PFA, PFI sau SRL</strong> cu CUI/CIF și IBAN. Ai nevoie de o mașină de spălat profesională și un calandru (mașină de călcat), un autovehicul pentru livrări și un spațiu de depozitare. Alegi zona în care operezi.` },
+      { q: "Cât câștig?", a: `Primești <strong>${linenPct}%</strong> din prețul fiecărui set de lenjerie spălat (${C.linenSetPriceRon} lei/set ≈ ${linenEurSet}); platforma reține ${S.commissionPct()}%. La consumabilele pe care le distribui Agenților Cleaning primești <strong>${C.consumableSplit.laundry}%</strong> din adaos, iar achiziția ți se rambursează.` },
+      { q: "Cum funcționează lenjeria de închiriat?", a: `O duci, o ridici după check-out și o speli tot tu. Câștigul tău vine <strong>doar din spălare</strong> (${linenPct}%) — taxa de chirie este integral a platformei.` },
+      { q: "Când și cum sunt plătit?", a: `Încasezi <strong>după ce marchezi lenjeria gata</strong> (spălată, călcată, adusă), din avansul deja plătit de client. Totul prin platformă, fără facturi neîncasate.` },
+      { q: "De unde preiau lenjeria?", a: `Preiei seturile pe care Agentul Cleaning din zona ta nu le spală, sau o <strong>rută întreagă</strong> din locații. Fiecare set este <strong>etichetat individual</strong>, ca să nu se încurce cu ale altcuiva.` },
+      { q: "Ce e cu consumabilele?", a: `Preiei consumabilele de la administrator și le <strong>distribui Agenților Cleaning</strong> conform solicitărilor. Îți recuperezi costul de achiziție și primești ${C.consumableSplit.laundry}% din adaosul comercial.` },
+      { q: "Trebuie să depun o garanție?", a: `Da, o <strong>garanție returnabilă</strong> la înscriere, care acoperă lenjeria și consumabilele aflate în grija ta. Se restituie la încetarea colaborării.` },
+      { q: "Mă afectează opțiunile urgență / rambursabil ale clientului?", a: `Nu. Acele prime merg către <strong>Agentul Cleaning</strong>; câștigul tău din spălare și consumabile rămâne neschimbat.` },
     ];
     app.appendChild(el(`
       <div class="home">
@@ -3927,6 +4021,8 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
           </div>
         </div></section>
 
+        ${faqSection("Întrebări frecvente", "Ce întreabă serviciile de lenjerie", "Câștiguri, rute, consumabile și garanție — pe scurt și clar.", laFaq, { soft: false })}
+
         <section class="h-section"><div class="wrap">
           <div class="h-cta-band">
             <h2>Începe să câștigi din lenjerie regim hotelier</h2>
@@ -3941,7 +4037,7 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         <footer class="h-footer"><div class="wrap">
           <div class="cols">
             <div><div class="foot-logo"><span>🧽</span> Sleep &amp; Go Cleaning</div><p>Spălare, călcat și distribuție de lenjerie în regim hotelier.</p><p>📞 ${PHONE}</p></div>
-            <div><h4>Serviciu lenjerie</h4><a data-scroll="la-castig">Cât câștigi</a><a data-scroll="la-nevoie">Condiții</a><a data-scroll="la-cum">Cum începi</a></div>
+            <div><h4>Serviciu lenjerie</h4><a data-scroll="la-castig">Cât câștigi</a><a data-scroll="la-nevoie">Condiții</a><a data-scroll="la-cum">Cum începi</a><a data-scroll="faq">Întrebări frecvente</a></div>
             <div><h4>Cont</h4><a data-reg="spalatorie">Înscrie-te</a><a data-view="executant">Pentru Agenți Cleaning →</a><a data-go="login">Autentificare</a><a data-home>← Pagina principală</a></div>
           </div>
           <div class="copyright">© 2026 Sleep &amp; Go Cleaning. Toate drepturile rezervate.</div>
