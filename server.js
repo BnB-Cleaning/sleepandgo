@@ -415,6 +415,80 @@ function mergeNewsletter(prev, next) {
   if (!(next.newsletter.intervalDays > 0)) next.newsletter.intervalDays = pn.intervalDays || 2;
 }
 
+/* =========================================================
+   REFERRAL — recomandă și câștigă (toate categoriile)
+   - Recomanzi pe cineva cu linkul tău (?ref=COD). La înregistrare, noul cont primește referredBy.
+   - Câștigi 10% din COMISIONUL platformei pentru primele 3 acțiuni ale celui recomandat
+     (3 solicitări finalizate dacă e solicitant / 3 lucrări executate dacă e operator).
+   - Plata se face după ce se acumulează 50 €.
+   - Registrul (clicuri, credite, plăți) e ținut de server; clienții nu-l pot modifica prin /api/state.
+   ========================================================= */
+const REF_PCT = 10;          // % din comision
+const REF_CAP = 3;           // primele N acțiuni ale recomandatului
+const REF_PAYOUT_EUR = 50;   // prag de plată
+function ensureReferrals(st) {
+  if (!st.referrals || typeof st.referrals !== "object") st.referrals = {};
+  const r = st.referrals;
+  if (!r.clicks || typeof r.clicks !== "object") r.clicks = {};
+  if (!Array.isArray(r.ledger)) r.ledger = [];
+  if (!r.paid || typeof r.paid !== "object") r.paid = {};
+  return r;
+}
+function genRefCode(st) {
+  const AL = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const used = new Set((st.users || []).map(u => u.refCode).filter(Boolean));
+  let code; do { code = Array.from({ length: 6 }, () => AL[Math.floor(Math.random() * AL.length)]).join(""); } while (used.has(code));
+  return code;
+}
+function ensureRefCodes(st) {
+  for (const u of (st.users || [])) if (!u.refCode) u.refCode = genRefCode(st);
+}
+function refEarned(st, userId) {
+  return round2((st.referrals.ledger || []).filter(e => e.referrerId === userId).reduce((s, e) => s + (Number(e.amountEur) || 0), 0));
+}
+// Creditează recomandările pentru solicitările nou-finalizate (tranziție reală)
+function creditReferrals(prev, next) {
+  const oldById = new Map((prev.requests || []).map(r => [r.id, r]));
+  ensureReferrals(next);
+  const byId = new Map((next.users || []).map(u => [u.id, u]));
+  for (const r of (next.requests || [])) {
+    if (!reqEnded(r)) continue;
+    const old = oldById.get(r.id);
+    if (!(old && !reqEnded(old))) continue;          // doar tranziția reală creditează
+    const reward = round2((Number(r.commissionEur) || 0) * REF_PCT / 100);
+    if (reward <= 0) continue;
+    const creditSide = (userId, flag) => {
+      if (!userId || r[flag]) return;
+      const ru = byId.get(userId); if (!ru || !ru.referredBy) { r[flag] = true; return; }
+      const referrer = byId.get(ru.referredBy); if (!referrer || referrer.id === ru.id) { r[flag] = true; return; }
+      const cnt = next.referrals.ledger.filter(e => e.referredUserId === ru.id).length;
+      if (cnt >= REF_CAP) { r[flag] = true; return; }
+      next.referrals.ledger.push({ id: uid("rc"), referrerId: referrer.id, referredUserId: ru.id, reqId: r.id, role: ru.role || "", amountEur: reward, at: Date.now() });
+      r[flag] = true;
+    };
+    creditSide(r.requesterId, "refCreditedRequester");
+    creditSide(r.executorId, "refCreditedExecutor");
+  }
+}
+// Protecție: registrul de referral + codurile rămân sub controlul serverului
+function mergeReferral(prev, next) {
+  next.referrals = (prev && prev.referrals) ? prev.referrals : { clicks: {}, ledger: [], paid: {} };
+  const pu = new Map(((prev && prev.users) || []).map(u => [u.id, u]));
+  for (const u of (next.users || [])) {
+    const o = pu.get(u.id);
+    if (o) { if (o.refCode) u.refCode = o.refCode; if (o.referredBy !== undefined && o.referredBy !== null) u.referredBy = o.referredBy; }
+  }
+  const pr = new Map(((prev && prev.requests) || []).map(r => [r.id, r]));
+  for (const r of (next.requests || [])) {
+    const o = pr.get(r.id);
+    if (o) {
+      if (o.refCreditedRequester) r.refCreditedRequester = true;
+      if (o.refCreditedExecutor) r.refCreditedExecutor = true;
+      if (o.commissionEur && !r.commissionEur) r.commissionEur = o.commissionEur;
+    }
+  }
+}
+
 // Aplică lista canonică de produse pe baza existentă (o singură dată per versiune)
 async function ensureProducts() {
   const st = await getState();
@@ -577,6 +651,11 @@ app.post("/api/auth/register", async (req, res) => {
       phone: b.phone || "", address: b.address || "",
       business: needsBiz ? b.business : null,
     };
+    // referral: cod propriu + cine l-a recomandat (din ?ref=COD)
+    ensureReferrals(st);
+    user.refCode = genRefCode(st);
+    const refCode = String(b.ref || "").trim().toUpperCase();
+    if (refCode) { const referrer = st.users.find(u => u.refCode === refCode); if (referrer && referrer.id !== id) user.referredBy = referrer.id; }
     st.users.push(user);
     await store.set("pw:" + id, hashPassword(pass));
     await saveState(st);
@@ -629,6 +708,8 @@ app.post("/api/state", async (req, res) => {
     const prev = await getState();
     jobs = markTransitions(prev, incoming);
     mergeNewsletter(prev, incoming);   // abonații rămân sub controlul serverului
+    mergeReferral(prev, incoming);     // registrul de referral rămâne sub controlul serverului
+    creditReferrals(prev, incoming);   // creditează recomandările la finalizarea solicitărilor
   } catch (e) { console.log("[notify] diff eșuat:", e.message); }
   // păstrăm parolele intacte: state nu conține parole, deci doar salvăm (cu flag-urile de notificare)
   await saveState(incoming);
@@ -863,6 +944,34 @@ app.post("/api/newsletter/broadcast", async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
+/* ---------------- Referral: click pe link (public) + plată (admin) ---------------- */
+app.post("/api/ref/click", async (req, res) => {
+  try {
+    const code = String((req.body && req.body.code) || "").trim().toUpperCase();
+    if (!code) return res.json({ ok: false });
+    const st = await getState(); const r = ensureReferrals(st);
+    const exists = (st.users || []).some(u => u.refCode === code);
+    if (!exists) return res.json({ ok: false });
+    r.clicks[code] = (r.clicks[code] || 0) + 1;
+    await saveState(st);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
+});
+app.post("/api/ref/payout", async (req, res) => {
+  try {
+    const uidReq = readSession(req);
+    const st = await getState();
+    const me = (st.users || []).find(u => u.id === uidReq);
+    if (!me || me.role !== "admin") return res.status(403).json({ ok: false, error: "Doar administratorul." });
+    const userId = req.body && req.body.userId;
+    const r = ensureReferrals(st);
+    const earned = refEarned(st, userId);
+    r.paid[userId] = earned;   // marchează tot ca plătit
+    await saveState(st);
+    res.json({ ok: true, paid: earned });
+  } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
+});
+
 // --- SEO: robots.txt + sitemap.xml dinamic (listează articolele de blog) ---
 const SITE_URL = (process.env.SITE_URL || "https://www.sleepandgocleaning.com").replace(/\/+$/, "");
 
@@ -908,7 +1017,7 @@ app.get("*", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
   await ensureProducts(); // aplică lista de produse (versiune)
   await ensureAdmin();   // creează adminul dacă lipsește
   await promoteExecutants(); // conversie one-off solicitant → Agent Cleaning (env PROMOTE_EXECUTANT)
-  try { const st = await getState(); ensureNewsletter(st); await saveState(st); } catch (e) {}
+  try { const st = await getState(); ensureNewsletter(st); ensureReferrals(st); ensureRefCodes(st); await saveState(st); } catch (e) {}
   startNewsletterEngine();   // motor drip newsletter (secvențe email la 2 zile)
   app.listen(PORT, () => console.log("Sleep & Go pe portul " + PORT));
 })();

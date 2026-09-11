@@ -449,6 +449,23 @@ a.pill.contact:hover { background: var(--brand); color: #fff; }
 .subs-row .sr-main { flex: 1 1 220px; min-width: 0; word-break: break-word; }
 .subs-row .sr-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
+/* ===== Referral — panou în cont ===== */
+.ref-panel { }
+.ref-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.ref-head .ref-ico { font-size: 30px; line-height: 1; }
+.ref-head h3 { font-size: 18px; }
+.ref-lbl { display: block; font-size: 13px; color: var(--muted, #93a6b5); margin: 0 0 6px; font-weight: 600; }
+.ref-linkbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+.ref-linkbar input { flex: 1 1 240px; min-width: 0; background: var(--card-2, #22323f); border: 1px solid var(--line, #2c3e4f); color: #eaf3f9; border-radius: 10px; padding: 11px 13px; font-size: 14px; font-family: inherit; }
+.ref-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.ref-stats .rs { background: var(--card-2, #22323f); border: 1px solid var(--line, #2c3e4f); border-radius: 12px; padding: 14px; text-align: center; }
+.ref-stats .rs.hi { background: #10485f; border-color: #1c6c8c; }
+.ref-stats .rs-n { display: block; font-size: 22px; font-weight: 800; color: #eaf3f9; line-height: 1.1; }
+.ref-stats .rs-l { display: block; font-size: 12px; color: var(--muted, #93a6b5); margin-top: 3px; }
+.ref-prog { height: 10px; border-radius: 999px; background: var(--card-2, #22323f); border: 1px solid var(--line, #2c3e4f); overflow: hidden; margin-bottom: 8px; }
+.ref-prog-bar { height: 100%; background: linear-gradient(90deg, #00b4e6, #2ecc71); border-radius: 999px; transition: width .3s ease; }
+.ref-note { margin: 0; font-size: 13px; }
+
 /* =========================================================
    Sleep & Go Cleaning — HOME / LANDING
    Brand preluat de pe sleepandgocleaning.com:
@@ -858,6 +875,17 @@ body.landing-active { background: var(--h-bg); }
 .h-footer .fn-form input:focus { outline: none; border-color: var(--h-blue); }
 .h-footer .fn-form button { flex: 0 0 auto; }
 .h-footer .fn-note { flex-basis: 100%; margin: 4px 0 0; font-size: 13px; font-weight: 600; }
+
+/* ===== Referral — secțiune landing „Recomandă și câștigă" ===== */
+.ref-promo { display: flex; gap: 28px; align-items: center; background: linear-gradient(135deg, #eaf6fd, #f3f7fc); border: 1px solid #cfe6f6; border-radius: 22px; padding: 34px 32px; flex-wrap: wrap; }
+.ref-promo-badge { flex: 0 0 auto; width: 84px; height: 84px; border-radius: 22px; display: grid; place-items: center; font-size: 42px; background: #fff; box-shadow: 0 12px 30px rgba(20, 40, 80, .12); }
+.ref-promo-text { flex: 1 1 320px; }
+.ref-promo-text h2 { margin: 8px 0 10px; }
+.ref-promo-text > p { color: #33414f; font-size: 15.5px; line-height: 1.65; margin: 0 0 18px; max-width: 62ch; }
+.ref-promo-steps { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+.ref-promo-steps .rps { flex: 1 1 200px; display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid #e6ecf3; border-radius: 12px; padding: 12px 14px; font-size: 14px; color: #33414f; font-weight: 500; }
+.ref-promo-steps .rps-n { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--h-blue); color: #fff; font-weight: 800; font-size: 14px; font-family: "Poppins", sans-serif; }
+@media (max-width: 640px){ .ref-promo { padding: 26px 22px; } }
 
 </style>
 
@@ -1494,8 +1522,10 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     async register(data) {
       const { name, email, password, role, area, business, phone, address } = data;
       if (MODE === "api") {
-        const r = await apiPOST("/api/auth/register", data);
+        let ref = ""; try { ref = localStorage.getItem("sgc_ref") || ""; } catch (e) {}
+        const r = await apiPOST("/api/auth/register", { ...data, ref });
         if (!r.ok) return { ok: false, error: r.error || "Înregistrare eșuată." };
+        try { localStorage.removeItem("sgc_ref"); } catch (e) {}
         await refreshState();
         db.session = r.user.id;
         return { ok: true, user: r.user };
@@ -1517,6 +1547,11 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         phone: phone || "",
         address: address || "",   // adresă/sediu (Agent Cleaning) — folosită la ridicarea lenjeriei
       };
+      // referral (local): cod propriu + cine l-a recomandat
+      this._ensureReferrals();
+      u.refCode = this._genRefCode();
+      let ref = ""; try { ref = (localStorage.getItem("sgc_ref") || "").toUpperCase(); } catch (e) {}
+      if (ref) { const referrer = db.users.find(x => x.refCode === ref); if (referrer) u.referredBy = referrer.id; try { localStorage.removeItem("sgc_ref"); } catch (e) {} }
       db.users.push(u); db.session = u.id; save(db); return { ok: true, user: u };
     },
     async logout() {
@@ -1696,6 +1731,84 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       // local: simulăm trimiterea (fără server email)
       const targets = this.newsletterSubs(category).filter(s => !s.unsubscribed);
       return { ok: true, sent: 0, total: targets.length, local: true };
+    },
+
+    // ---- Referral (recomandă și câștigă) ----
+    REF_PCT: 10, REF_CAP: 3, REF_PAYOUT_EUR: 50,
+    _ensureReferrals() {
+      if (!db.referrals || typeof db.referrals !== "object") db.referrals = {};
+      const r = db.referrals;
+      if (!r.clicks || typeof r.clicks !== "object") r.clicks = {};
+      if (!Array.isArray(r.ledger)) r.ledger = [];
+      if (!r.paid || typeof r.paid !== "object") r.paid = {};
+      return r;
+    },
+    _genRefCode() {
+      const AL = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      const used = new Set((db.users || []).map(u => u.refCode).filter(Boolean));
+      let c; do { c = Array.from({ length: 6 }, () => AL[Math.floor(Math.random() * AL.length)]).join(""); } while (used.has(c));
+      return c;
+    },
+    myRefCode(u) {
+      if (!u) return "";
+      if (!u.refCode) {   // fallback (mod local / conturi vechi)
+        if (MODE !== "api") { u.refCode = this._genRefCode(); save(db); }
+      }
+      return u.refCode || "";
+    },
+    refLink(u) {
+      let o = "https://www.sleepandgocleaning.com";
+      try { o = location.origin; if (/sleepandgocleaning\.com/i.test(o)) o = o.replace("://", "://www.").replace("www.www.", "www."); } catch (e) {}
+      return o.replace(/\/$/, "") + "/?ref=" + this.myRefCode(u);
+    },
+    refStats(u) {
+      const R = this._ensureReferrals();
+      const mine = R.ledger.filter(e => e.referrerId === u.id);
+      const earned = round2(mine.reduce((s, e) => s + (Number(e.amountEur) || 0), 0));
+      const paid = round2(R.paid[u.id] || 0);
+      const pending = round2(earned - paid);
+      return {
+        code: this.myRefCode(u), link: this.refLink(u),
+        clicks: R.clicks[this.myRefCode(u)] || 0,
+        earned, paid, pending, credits: mine.length,
+        eligible: pending >= this.REF_PAYOUT_EUR, threshold: this.REF_PAYOUT_EUR,
+      };
+    },
+    async recordRefClick(code) {
+      code = String(code || "").toUpperCase(); if (!code) return;
+      if (MODE === "api") { try { await apiPOST("/api/ref/click", { code }); } catch (e) {} return; }
+      const R = this._ensureReferrals();
+      if ((db.users || []).some(u => u.refCode === code)) { R.clicks[code] = (R.clicks[code] || 0) + 1; save(db); }
+    },
+    // apelat la încărcarea aplicației: prinde ?ref=COD din URL, îl reține și numără clicul (o dată/browser)
+    async refCaptureFromUrl() {
+      try {
+        const p = new URLSearchParams(location.search);
+        const code = (p.get("ref") || "").trim().toUpperCase();
+        if (!code) return;
+        localStorage.setItem("sgc_ref", code);
+        const flag = "sgc_refclk_" + code;
+        if (!localStorage.getItem(flag)) { await this.recordRefClick(code); localStorage.setItem(flag, "1"); }
+      } catch (e) {}
+    },
+    // admin: toți cei cu câștiguri din recomandări
+    referrers() {
+      const R = this._ensureReferrals();
+      const ids = [...new Set(R.ledger.map(e => e.referrerId))];
+      return ids.map(id => {
+        const u = this.userById(id);
+        const st = u ? this.refStats(u) : { earned: 0, paid: 0, pending: 0, credits: 0, eligible: false };
+        return { id, name: u ? u.name : id, email: u ? u.email : "", role: u ? u.role : "", ...st };
+      }).sort((a, b) => b.pending - a.pending);
+    },
+    async refPayout(userId) {
+      if (MODE === "api") {
+        let r; try { r = await apiPOST("/api/ref/payout", { userId }); } catch (e) { return { ok: false, error: "Eroare de rețea." }; }
+        if (r && r.ok) { try { await refreshState(); } catch (e) {} }
+        return r || { ok: false };
+      }
+      const R = this._ensureReferrals(); const u = this.userById(userId);
+      R.paid[userId] = u ? this.refStats(u).earned : 0; save(db); return { ok: true };
     },
 
     // ---- Consumabile (catalog gestionat de admin) ----
@@ -2084,6 +2197,7 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     markReady(id) {
       const r = this.requestById(id); if (!r) return;
       this.setStatus(id, STATUS.FINALIZAT);   // finalizează + eliberează plata
+      try { r.commissionEur = breakdown(r).commission; } catch (e) {}  // pt. calculul recomandărilor (10% din comision)
       r.readyNotified = true; r.readyAt = Date.now();
       r.workFinishedAt = Date.now();          // pontaj: ora de terminare
       if (!r.workStartedAt) r.workStartedAt = r.workFinishedAt;  // fallback dacă n-a apăsat «Începe lucrul»
@@ -3143,6 +3257,9 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         <!-- Întrebări frecvente -->
         ${faqSection("Întrebări frecvente", "Ce vor să știe proprietarii", "Răspunsuri clare despre prețuri, plată, garanție și cum decurge o curățenie în regim hotelier.", homeFaq, { soft: true, image: (window.SHOTS || {}).client, imageAlt: "Interfața solicitantului — trimitere solicitare nouă", imageCaption: "Interfața solicitantului: alegi locația, data, intervalul și lenjeria, apoi plătești în avans." })}
 
+        <!-- Recomandă și câștigă -->
+        ${referralPromo()}
+
         <!-- CTA band -->
         <section class="h-section"><div class="wrap">
           <div class="h-cta-band">
@@ -3391,6 +3508,68 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         else setNote((res && res.error) || "Nu s-a putut face abonarea.", false);
       };
     });
+  }
+
+  /* ---------- Referral: „Recomandă și câștigă" (panou cont + secțiune landing) ---------- */
+  function referralPanel(u) {
+    const st = S.refStats(u);
+    const pct = Math.min(100, Math.round((st.pending / st.threshold) * 100));
+    return `
+      <div class="ref-panel">
+        <div class="ref-head"><span class="ref-ico">🎁</span><div><h3 style="margin:0">Recomandă și câștigă</h3><p style="margin:2px 0 0;color:var(--muted,#8aa)">Câștigi <strong>${S.REF_PCT}%</strong> din comision pentru primele <strong>${S.REF_CAP}</strong> acțiuni ale fiecărei persoane recomandate. Plată la <strong>${S.REF_PAYOUT_EUR} €</strong>. Poți recomanda pe oricine (solicitanți, Agenți Cleaning, servicii de lenjerie).</p></div></div>
+        <label class="ref-lbl">Linkul tău de recomandare</label>
+        <div class="ref-linkbar">
+          <input id="refLink" readonly value="${esc(st.link)}" />
+          <button class="btn" id="refCopy">📋 Copiază</button>
+          <button class="btn btn-soft" id="refShare">🔗 Distribuie</button>
+        </div>
+        <div class="ref-stats">
+          <div class="rs"><span class="rs-n">${st.clicks}</span><span class="rs-l">clicuri pe link</span></div>
+          <div class="rs"><span class="rs-n">${st.credits}</span><span class="rs-l">acțiuni creditate</span></div>
+          <div class="rs"><span class="rs-n">${money(st.earned)}</span><span class="rs-l">câștig total</span></div>
+          <div class="rs hi"><span class="rs-n">${money(st.pending)}</span><span class="rs-l">de încasat</span></div>
+        </div>
+        <div class="ref-prog" title="${money(st.pending)} din ${st.threshold} €"><div class="ref-prog-bar" style="width:${pct}%"></div></div>
+        <p class="hint ref-note" style="color:var(--muted,#8aa)">${st.eligible
+          ? `✅ Ai atins pragul de ${st.threshold} € — plata se procesează de administrator.`
+          : `Încă <strong>${money(Math.max(0, st.threshold - st.pending))}</strong> până la pragul de plată de ${st.threshold} €.`}</p>
+      </div>`;
+  }
+  function wireReferral(root) {
+    root = root || document;
+    const copy = root.querySelector("#refCopy");
+    if (copy) copy.onclick = () => {
+      const i = root.querySelector("#refLink"); if (!i) return;
+      i.select();
+      try { navigator.clipboard.writeText(i.value); } catch (e) { try { document.execCommand("copy"); } catch (e2) {} }
+      toast("Link copiat!", "ok");
+    };
+    const share = root.querySelector("#refShare");
+    if (share) share.onclick = async () => {
+      const i = root.querySelector("#refLink"); const url = i ? i.value : "";
+      if (navigator.share) { try { await navigator.share({ title: "Sleep & Go Cleaning", text: "Îți recomand Sleep & Go Cleaning 🧽", url }); } catch (e) {} }
+      else { try { navigator.clipboard.writeText(url); toast("Link copiat!", "ok"); } catch (e) {} }
+    };
+  }
+  // secțiune promo pe landing-uri (logat sau nu) — evidențiază programul
+  function referralPromo() {
+    return `
+      <section class="h-section soft" id="referral"><div class="wrap">
+        <div class="ref-promo">
+          <div class="ref-promo-badge">🎁</div>
+          <div class="ref-promo-text">
+            <div class="eyebrow">🤝 Program de recomandare</div>
+            <h2>Recomandă și câștigă</h2>
+            <p>Recomandă pe oricine — proprietari, Agenți Cleaning sau servicii de lenjerie — și primești <strong>${S.REF_PCT}% din comisionul platformei</strong> pentru <strong>primele ${S.REF_CAP} acțiuni</strong> ale fiecărei persoane aduse. Banii se plătesc când aduni <strong>${S.REF_PAYOUT_EUR} €</strong>. Toate categoriile pot recomanda către toate categoriile.</p>
+            <div class="ref-promo-steps">
+              <div class="rps"><span class="rps-n">1</span> Îți iei linkul unic din contul tău</div>
+              <div class="rps"><span class="rps-n">2</span> Îl distribui — vezi clicurile în timp real</div>
+              <div class="rps"><span class="rps-n">3</span> Câștigi din primele ${S.REF_CAP} acțiuni ale fiecărei recomandări</div>
+            </div>
+            <div class="cta-row"><button class="h-btn primary lg" data-go="register">Creează cont și ia linkul</button><button class="h-btn ghost lg" data-go="login">Am deja cont</button></div>
+          </div>
+        </div>
+      </div></section>`;
   }
 
   /* ---------- SEO / AEO / GEO: meta tags + Open Graph + JSON-LD ---------- */
@@ -3788,6 +3967,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
           </div>
         </div></section>
         ${faqSection("Întrebări frecvente", "Despre închirierea de lenjerie", "Cum decurge serviciul de închiriere, ce conține un set și cum te înregistrezi.", rentalFaq, { soft: true })}
+        ${referralPromo()}
         ${blogChromeEnd("rental")}
       </div>
     `));
@@ -3965,6 +4145,8 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         </div></section>
 
         ${faqSection("Întrebări frecvente", "Ce întreabă Agenții Cleaning", "Tot ce vrei să știi despre câștiguri, plată și cum preiei lucrări în zona ta.", exFaq, { soft: false, image: (window.SHOTS || {}).executant, imageAlt: "Interfața Agentului Cleaning — o lucrare cu detalii și câștig", imageCaption: "Interfața Agentului Cleaning: vezi lucrarea, detaliile de check-in, câștigul tău și butoanele video înainte/după." })}
+
+        ${referralPromo()}
 
         <section class="h-section"><div class="wrap">
           <div class="h-cta-band">
@@ -4210,6 +4392,8 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
 
         ${faqSection("Întrebări frecvente", "Ce întreabă serviciile de lenjerie", "Câștiguri, rute, consumabile și garanție — pe scurt și clar.", laFaq, { soft: false, image: (window.SHOTS || {}).spalatorie, imageAlt: "Interfața serviciului de lenjerie — lenjerie de preluat", imageCaption: "Interfața serviciului de lenjerie: vezi seturile de preluat, adresa de ridicare și câștigul tău (70%)." })}
 
+        ${referralPromo()}
+
         <section class="h-section"><div class="wrap">
           <div class="h-cta-band">
             <h2>Începe să câștigi din lenjerie regim hotelier</h2>
@@ -4305,6 +4489,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         <button data-t="mine" class="${solTab === "mine" ? "active" : ""}">📋 Solicitările mele</button>
         <button data-t="expenses" class="${solTab === "expenses" ? "active" : ""}">💶 Cheltuieli</button>
         <button data-t="linen" class="${solTab === "linen" ? "active" : ""}">🧺 Lenjeria mea</button>
+        <button data-t="referral" class="${solTab === "referral" ? "active" : ""}">🎁 Recomandă</button>
       </div>
       <div id="solBody"></div>
     `));
@@ -4315,6 +4500,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     else if (solTab === "locations") renderMyLocations(u);
     else if (solTab === "expenses") renderMyExpenses(u);
     else if (solTab === "linen") renderMyLinen(u);
+    else if (solTab === "referral") { $("#solBody").innerHTML = referralPanel(u); wireReferral($("#solBody")); }
     else renderMyRequests(u);
   }
 
@@ -4855,6 +5041,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         <button data-t="activity" class="${execTab === "activity" ? "active" : ""}">⏱️ Activitatea mea</button>
         <button data-t="earnings" class="${execTab === "earnings" ? "active" : ""}">💶 Încasări</button>
         <button data-t="stock" class="${execTab === "stock" ? "active" : ""}">📦 Stocul meu</button>
+        <button data-t="referral" class="${execTab === "referral" ? "active" : ""}">🎁 Recomandă</button>
       </div>
       <div id="execBody"></div>
     `));
@@ -4866,6 +5053,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     else if (execTab === "stock") renderMyStock(u);
     else if (execTab === "activity") renderMyActivity(u);
     else if (execTab === "earnings") renderMyEarnings(u);
+    else if (execTab === "referral") { $("#execBody").innerHTML = referralPanel(u); wireReferral($("#execBody")); }
     else renderMyJobs(u, jobs);
   }
 
@@ -4982,6 +5170,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         <button data-t="available" class="${laundryTab === "available" ? "active" : ""}">🧺 Lenjerie disponibilă (${avail.length})</button>
         <button data-t="jobs" class="${laundryTab === "jobs" ? "active" : ""}">📋 Lucrările mele (${jobs.length})</button>
         <button data-t="earnings" class="${laundryTab === "earnings" ? "active" : ""}">💶 Încasări</button>
+        <button data-t="referral" class="${laundryTab === "referral" ? "active" : ""}">🎁 Recomandă</button>
       </div>
       <div id="laundryBody"></div>
     `));
@@ -4990,6 +5179,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     if ($("#addCleanRole")) $("#addCleanRole").onclick = () => requestRoleSelf(u, "executant", "Agent Cleaning");
     $("#avatarBtn").onclick = () => openProfile(u);
     const body = $("#laundryBody");
+    if (laundryTab === "referral") { body.innerHTML = referralPanel(u); wireReferral(body); return; }
     if (laundryTab === "earnings") { renderEarningsCalendar(u, body, () => renderSpalatorie(u)); return; }
     const list = laundryTab === "available" ? avail : jobs;
     if (!list.length) {
@@ -5135,6 +5325,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     const stockAlerts = S.stockAlerts().length;
     const roleReqCount = S.pendingRoleRequests().length;
     const newsCount = S.newsletterSubs().filter(s => !s.unsubscribed).length;
+    const refPend = S.referrers().filter(r => r.eligible).length;
     app.appendChild(el(`
       <div class="page-head">
         <h1>Panou administrare</h1>
@@ -5152,6 +5343,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         <button data-t="users" class="${adminTab === "users" ? "active" : ""}">👥 Utilizatori${roleReqCount ? ` <span class="tab-alert">${roleReqCount}</span>` : ""}</button>
         <button data-t="blog" class="${adminTab === "blog" ? "active" : ""}">📝 Blog</button>
         <button data-t="newsletter" class="${adminTab === "newsletter" ? "active" : ""}">📧 Newsletter${newsCount ? ` (${newsCount})` : ""}</button>
+        <button data-t="referral" class="${adminTab === "referral" ? "active" : ""}">🎁 Referral${refPend ? ` <span class="tab-alert">${refPend}</span>` : ""}</button>
       </div>
       <div id="admBody"></div>
     `));
@@ -5166,6 +5358,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     else if (adminTab === "time") renderAdminTime();
     else if (adminTab === "blog") renderAdminBlog(u);
     else if (adminTab === "newsletter") renderAdminNewsletter(u);
+    else if (adminTab === "referral") renderAdminReferral(u);
     else renderAdminUsers();
   }
 
@@ -5321,6 +5514,48 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     $("#subsList").querySelectorAll(".subDel").forEach(b => b.onclick = async () => {
       if (!confirm("Ștergi acest abonat definitiv?")) return;
       await S.removeSubscriber(b.dataset.id); toast("Abonat șters.", "ok"); renderAdmin(u);
+    });
+  }
+
+  /* ---- Admin: Referral (recomandări — solduri + plăți) ---- */
+  function renderAdminReferral(u) {
+    const body = $("#admBody");
+    const list = S.referrers();
+    const muted = "var(--muted,#8aa)";
+    const totalPending = list.reduce((s, r) => s + r.pending, 0);
+    const totalEarned = list.reduce((s, r) => s + r.earned, 0);
+    body.innerHTML = `
+      <div class="card" style="margin-bottom:14px">
+        <strong>🎁 Program de recomandare</strong>
+        <p class="hint" style="margin:4px 0 0;color:${muted}">Fiecare cont are un link unic. Recomandantul primește <strong>${S.REF_PCT}%</strong> din comision pentru primele <strong>${S.REF_CAP}</strong> acțiuni ale celui recomandat (solicitări finalizate / lucrări executate). Plata se face la <strong>${S.REF_PAYOUT_EUR} €</strong>.</p>
+        <div class="news-counts">
+          <div class="nc"><span class="nc-n">${list.length}</span><span class="nc-l">recomandanți</span></div>
+          <div class="nc"><span class="nc-n">${money(totalEarned)}</span><span class="nc-l">câștig total</span></div>
+          <div class="nc total"><span class="nc-n">${money(totalPending)}</span><span class="nc-l">de plătit</span></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:14px">
+        <strong>Linkul tău (administrator)</strong>
+        ${referralPanel(u)}
+      </div>
+
+      <div class="card">
+        <strong>Recomandanți &amp; solduri</strong>
+        <div id="refList" style="margin-top:10px">${list.length ? `<div class="subs-table">${list.map(r => `
+          <div class="subs-row">
+            <div class="sr-main"><strong>${esc(r.name)}</strong>${r.email ? " · " + esc(r.email) : ""} <span class="hint" style="color:${muted}">(${r.credits} acțiuni · ${r.clicks} clicuri)</span></div>
+            <div class="sr-meta"><span class="hint" style="color:${muted}">câștig ${money(r.earned)} · plătit ${money(r.paid)}</span><span class="badge${r.eligible ? " ok" : ""}">${money(r.pending)} de încasat</span></div>
+            <button class="btn btn-sm refPay" data-id="${esc(r.id)}" ${r.pending <= 0 ? "disabled" : ""}>${r.eligible ? "💸 Marchează plătit" : "Plătește oricum"}</button>
+          </div>`).join("")}</div>` : `<p class="hint" style="color:${muted}">Niciun câștig din recomandări încă.</p>`}</div>
+      </div>
+    `;
+    wireReferral(body);
+    body.querySelectorAll(".refPay").forEach(b => b.onclick = async () => {
+      const r = S.referrers().find(x => x.id === b.dataset.id); if (!r) return;
+      if (!confirm(`Marchezi ca plătit ${money(r.pending)} către ${r.name}?`)) return;
+      const res = await S.refPayout(b.dataset.id);
+      if (res && res.ok) { toast("Plată înregistrată.", "ok"); renderAdmin(u); } else toast((res && res.error) || "Eroare.", "err");
     });
   }
 
@@ -6882,11 +7117,12 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
 
   S.init(() => { try { renderApp(); } catch (e) {} })
     .then(async () => {
+      try { await S.refCaptureFromUrl(); } catch (e) {}   // prinde ?ref=COD (recomandare) + numără clicul
       await handlePaymentReturn();
       landingView = pathToView(location.pathname);   // deschide landing-ul din URL (link direct)
       renderApp(); initLang();
     })
-    .catch(() => { landingView = pathToView(location.pathname); renderApp(); initLang(); });
+    .catch(async () => { try { await S.refCaptureFromUrl(); } catch (e) {} landingView = pathToView(location.pathname); renderApp(); initLang(); });
 })();
 
 </script>
