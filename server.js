@@ -95,9 +95,9 @@ function priceOfServer(req, st) {
   // opțiuni cu suprataxă — EXCLUSIVE (nu se cumulează): urgența are prioritate dacă ambele apar
   const urgentAddEur = req.urgent ? round2(baseEur * PRICE.urgentSurchargePct / 100) : 0;
   const refundableAddEur = (req.refundable && !req.urgent) ? round2(baseEur * PRICE.refundableSurchargePct / 100) : 0;
-  // discount ofertă de lansare (blocat pe solicitare la creare) — suportat din comisionul adminului
-  const launchPct = Number(req.launchDiscountPct) || 0;
-  const launchDiscountEur = launchPct ? round2(cleaningNet * launchPct / 100) : 0;
+  // discount (VIP sau ofertă de lansare, nu se cumulează) — suportat din comisionul adminului
+  const discPct = Math.max(Number(req.vipDiscountPct) || 0, Number(req.launchDiscountPct) || 0);
+  const launchDiscountEur = discPct ? round2(cleaningNet * discPct / 100) : 0;
   const totalEur = round2(baseEur + refundableAddEur + urgentAddEur - launchDiscountEur);
   const totalRon = Math.round(totalEur * ronPerEur);   // lei afișați clientului
   return { totalEur, totalRon, baniRon: totalRon * 100 };
@@ -553,6 +553,21 @@ async function promoteExecutants() {
 const app = express();
 
 // marchează o solicitare ca plătită (idempotent) — folosit de webhook și de /verify
+const VIP = { baseRon: 100, extraRon: 50, discountPct: 10, periodDays: 30 };
+function vipMonthlyRon(locations) { return VIP.baseRon + VIP.extraRon * (Math.max(1, Number(locations) || 1) - 1); }
+async function activateVipServer(userId, locations, sessionId) {
+  const st = await getState();
+  const u = (st.users || []).find(x => x.id === userId);
+  if (!u) return false;
+  const loc = Math.max(1, Number(locations) || 1);
+  const now = Date.now();
+  const prevUntil = (u.vip && u.vip.until && u.vip.until > now) ? u.vip.until : now;
+  u.vip = { active: true, since: (u.vip && u.vip.since) || now, until: prevUntil + VIP.periodDays * 86400000, locations: loc, monthlyRon: vipMonthlyRon(loc), lastPaymentAt: now };
+  if (sessionId) u.vip.stripeSessionId = sessionId;
+  await saveState(st);
+  console.log("[stripe] VIP activat:", userId, "·", loc, "locații");
+  return true;
+}
 async function markRequestPaid(reqId, sessionId) {
   const st = await getState();
   const r = (st.requests || []).find(x => x.id === reqId);
@@ -583,7 +598,9 @@ app.post("/api/pay/webhook", express.raw({ type: "application/json" }), async (r
   try {
     if (event.type === "checkout.session.completed") {
       const s = event.data.object;
-      if (s.payment_status === "paid" && s.metadata && s.metadata.reqId) {
+      if (s.payment_status === "paid" && s.metadata && s.metadata.vip) {
+        await activateVipServer(s.metadata.vip, s.metadata.locations, s.id);
+      } else if (s.payment_status === "paid" && s.metadata && s.metadata.reqId) {
         await markRequestPaid(s.metadata.reqId, s.id);
       }
     }
@@ -769,6 +786,41 @@ app.post("/api/pay/checkout", async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
+// --- Abonament VIP: creează sesiunea de Checkout (încasare în avans) ---
+app.post("/api/pay/vip/checkout", async (req, res) => {
+  try {
+    const uid = readSession(req);
+    if (!uid) return res.status(401).json({ ok: false, error: "Neautentificat." });
+    if (!stripe) return res.json({ ok: false, error: "stripe_unconfigured" });
+    const st = await getState();
+    const me = (st.users || []).find(u => u.id === uid);
+    if (!me) return res.status(404).json({ ok: false, error: "Cont inexistent." });
+    const approvedLoc = (st.locations || []).filter(l => l.ownerId === uid && l.status === "approved").length;
+    const locations = Math.max(1, Number(req.body && req.body.locations) || approvedLoc || 1);
+    const monthlyRon = vipMonthlyRon(locations);
+    const ronPerEur = ((st.settings || {}).ronPerEur > 0) ? st.settings.ronPerEur : PRICE.ronPerEur;
+    const baniRon = Math.round(monthlyRon * 100);   // lei → bani
+    const proto = (req.headers["x-forwarded-proto"] || "https").split(",")[0];
+    const origin = req.headers.origin || (proto + "://" + req.headers.host);
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: [{
+        price_data: {
+          currency: "ron",
+          product_data: { name: "Abonament VIP Member — " + locations + (locations === 1 ? " locație" : " locații"), description: "Acces VIP: 10% reducere la fiecare solicitare · " + VIP.periodDays + " zile" },
+          unit_amount: baniRon,
+        },
+        quantity: 1,
+      }],
+      metadata: { vip: uid, locations: String(locations) },
+      success_url: origin + "/?vip=1&session_id={CHECKOUT_SESSION_ID}",
+      cancel_url: origin + "/?vipcancel=1",
+    });
+    res.json({ ok: true, url: session.url });
+  } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
+});
+
 // --- Confirmă plata după întoarcerea de pe pagina Stripe (success_url) ---
 app.get("/api/pay/verify", async (req, res) => {
   try {
@@ -776,6 +828,10 @@ app.get("/api/pay/verify", async (req, res) => {
     const sid = req.query.session_id;
     if (!sid) return res.status(400).json({ ok: false, error: "Lipsă session_id." });
     const s = await stripe.checkout.sessions.retrieve(String(sid));
+    if (s && s.payment_status === "paid" && s.metadata && s.metadata.vip) {
+      await activateVipServer(s.metadata.vip, s.metadata.locations, s.id);
+      return res.json({ ok: true, paid: true, vip: true });
+    }
     if (s && s.payment_status === "paid" && s.metadata && s.metadata.reqId) {
       await markRequestPaid(s.metadata.reqId, s.id);
       return res.json({ ok: true, paid: true, reqId: s.metadata.reqId });

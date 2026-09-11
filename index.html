@@ -466,6 +466,25 @@ a.pill.contact:hover { background: var(--brand); color: #fff; }
 .ref-prog-bar { height: 100%; background: linear-gradient(90deg, #00b4e6, #2ecc71); border-radius: 999px; transition: width .3s ease; }
 .ref-note { margin: 0; font-size: 13px; }
 
+/* ===== VIP Member — card premium (cont) ===== */
+.vip-card { position: relative; overflow: hidden; border-radius: 18px; padding: 22px 24px; color: #f7ecd0;
+  background: linear-gradient(135deg, #1a1c26 0%, #2b2233 45%, #3a2b1c 100%);
+  border: 1px solid rgba(214, 178, 106, .5); box-shadow: 0 18px 40px rgba(0, 0, 0, .35); max-width: 460px; }
+.vip-card.inactive { filter: grayscale(.4); opacity: .92; }
+.vip-card .vip-shine { position: absolute; top: -60%; left: -20%; width: 60%; height: 220%; transform: rotate(20deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 245, 210, .18), transparent); pointer-events: none; }
+.vip-card .vip-row1 { display: flex; align-items: center; gap: 10px; }
+.vip-card .vip-crown { font-size: 24px; }
+.vip-card .vip-brand { font-family: "Poppins", sans-serif; font-weight: 800; font-size: 18px; line-height: 1; color: #fff; }
+.vip-card .vip-brand small { display: block; font-size: 10px; letter-spacing: .32em; color: #d6b26a; font-weight: 700; margin-top: 3px; }
+.vip-card .vip-badge { margin-left: auto; font-size: 11px; font-weight: 800; letter-spacing: .08em; color: #1a1c26;
+  background: linear-gradient(135deg, #f4d58b, #d6b26a); padding: 5px 12px; border-radius: 999px; }
+.vip-card .vip-chip { width: 44px; height: 32px; border-radius: 7px; margin: 20px 0 14px;
+  background: linear-gradient(135deg, #e9cf94, #b8923f); box-shadow: inset 0 1px 2px rgba(255, 255, 255, .5); }
+.vip-card .vip-name { font-family: "Poppins", sans-serif; font-size: 20px; font-weight: 700; color: #fff; letter-spacing: .04em; }
+.vip-card .vip-perk { color: #f4d58b; font-weight: 700; margin-top: 4px; }
+.vip-card .vip-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 16px; font-size: 12.5px; color: #cbb890; }
+
 /* =========================================================
    Sleep & Go Cleaning — HOME / LANDING
    Brand preluat de pe sleepandgocleaning.com:
@@ -897,6 +916,15 @@ body.landing-active { background: var(--h-bg); }
 .h-offer .ho-cta:hover { transform: translateY(-1px); }
 .sim-breakdown .sb-row.disc { color: #0a7d3f; font-weight: 700; }
 
+/* ===== VIP Member — secțiune home ===== */
+.vip-promo { display: grid; grid-template-columns: minmax(0, 460px) 1fr; gap: 40px; align-items: center; }
+@media (max-width: 900px){ .vip-promo { grid-template-columns: 1fr; gap: 28px; } }
+.vip-promo-text h2 { margin: 8px 0 12px; }
+.vip-promo-text > p { color: #33414f; font-size: 15.5px; line-height: 1.65; margin: 0 0 16px; max-width: 60ch; }
+.vip-promo-list { list-style: none; padding: 0; margin: 0 0 20px; display: grid; gap: 8px; }
+.vip-promo-list li { font-size: 15px; color: #33414f; font-weight: 500; }
+.vip-promo .vip-card { max-width: 100%; }
+
 </style>
 
   <header class="topbar" id="topbar" hidden>
@@ -965,6 +993,9 @@ body.landing-active { background: var(--h-bg); }
     // Ofertă de LANSARE: primele N curățenii primesc un discount, suportat din comisionul adminului
     // (plata Agentului Cleaning rămâne neschimbată — reducerea iese din comisionul platformei).
     launchOffer: { active: true, discountPct: 10, maxActions: 10 },
+    // Abonament VIP Member: 10% discount la fiecare solicitare; 100 lei/lună prima locație,
+    // +50 lei/lună pentru fiecare locație suplimentară; se încasează în avans (Stripe).
+    vip: { baseRon: 100, extraRon: 50, discountPct: 10, periodDays: 30 },
     // Sărbători legale România (fixe, format „LL-ZZ"). Paștele/Rusaliile sunt mobile (neincluse).
     legalHolidays: ["01-01", "01-02", "01-24", "05-01", "06-01", "08-15", "11-30", "12-01", "12-25", "12-26"],
     // limită de dimensiune pentru documentul de suprafață (demo, salvat în localStorage)
@@ -1307,9 +1338,12 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     const refundable = !!req.refundable && !urgent;   // rambursabilă doar dacă nu e urgentă
     const urgentAdd = urgent ? round2(baseTotal * CONFIG.urgentSurchargePct / 100) : 0;
     const refundableAdd = refundable ? round2(baseTotal * CONFIG.refundableSurchargePct / 100) : 0;
-    // discount ofertă de lansare — aplicat la curățenie; suportat din comisionul adminului
-    const launchDiscountPct = Number(req.launchDiscountPct) || 0;
-    const launchDiscount = launchDiscountPct ? round2(cleaningNet * launchDiscountPct / 100) : 0;
+    // discount aplicat la curățenie (VIP sau ofertă de lansare, nu se cumulează) — suportat din comisionul adminului
+    const vipPct = Number(req.vipDiscountPct) || 0;
+    const launchPct = Number(req.launchDiscountPct) || 0;
+    const discPct = Math.max(vipPct, launchPct);
+    const discountKind = vipPct >= launchPct && vipPct > 0 ? "vip" : (launchPct > 0 ? "launch" : "");
+    const launchDiscount = discPct ? round2(cleaningNet * discPct / 100) : 0;
     const total = round2(baseTotal + refundableAdd + urgentAdd - launchDiscount);
     return {
       cleaning, peakPct, peakAdd, surPct, surcharge, cleaningNet,
@@ -1318,7 +1352,7 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       serviceTotal, baseTotal,
       refundable, refundableAdd, refundableSurchargePct: CONFIG.refundableSurchargePct,
       urgent, urgentAdd, urgentSurchargePct: CONFIG.urgentSurchargePct,
-      launchDiscountPct, launchDiscount,
+      launchDiscountPct: discPct, launchDiscount, discountKind,
       total,
     };
   }
@@ -1422,6 +1456,7 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         refundable: !!data.refundable,
         urgent: !!data.urgent,
         launchDiscountPct: Number(data.launchDiscountPct) || 0,
+        vipDiscountPct: Number(data.vipDiscountPct) || 0,
       });
     },
     // info despre oferta de lansare (pentru bannerul din home + simulator)
@@ -1880,6 +1915,38 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       R.paid[userId] = round2((Number(R.paid[userId]) || 0) + Math.max(0, avail)); save(db); return { ok: true };
     },
 
+    // ---- VIP Member (abonament) ----
+    vipConfig() { return CONFIG.vip; },
+    vipMonthlyRon(locations) { const c = CONFIG.vip; return c.baseRon + c.extraRon * (Math.max(1, Number(locations) || 1) - 1); },
+    vipLocationsFor(u) { return Math.max(1, this.approvedLocationsOfOwner(u.id).length); },
+    isVipActive(u) { return !!(u && u.vip && u.vip.active && (!u.vip.until || u.vip.until > Date.now())); },
+    vipInfo(u) {
+      const c = CONFIG.vip;
+      const v = (u && u.vip) || null;
+      const active = this.isVipActive(u);
+      const locations = v ? v.locations : this.vipLocationsFor(u);
+      const monthlyRon = v ? v.monthlyRon : this.vipMonthlyRon(locations);
+      const daysLeft = (v && v.until) ? Math.max(0, Math.ceil((v.until - Date.now()) / 86400000)) : 0;
+      return { active, since: v ? v.since : null, until: v ? v.until : null, locations, monthlyRon, monthlyEur: round2(this.ronToEur(monthlyRon)), daysLeft, discountPct: c.discountPct };
+    },
+    // activează abonamentul (după plata simulată / mod local; pe server real se face din verify Stripe)
+    activateVip(locations) {
+      const u = this.currentUser(); if (!u) return { ok: false, error: "Neautentificat." };
+      const c = CONFIG.vip;
+      const loc = Math.max(1, Number(locations) || this.vipLocationsFor(u));
+      const now = Date.now();
+      const prevUntil = (u.vip && u.vip.until && u.vip.until > now) ? u.vip.until : now;
+      u.vip = { active: true, since: (u.vip && u.vip.since) || now, until: prevUntil + c.periodDays * 86400000, locations: loc, monthlyRon: this.vipMonthlyRon(loc), lastPaymentAt: now };
+      this.updateUser(u.id, { vip: u.vip });
+      return { ok: true, vip: u.vip };
+    },
+    async payVipCheckout(locations) {
+      if (MODE !== "api") return { ok: false, error: "demo" };
+      try { return await apiPOST("/api/pay/vip/checkout", { locations }); }
+      catch (e) { return { ok: false, error: String(e.message || e) }; }
+    },
+    vipMembers() { return (db.users || []).filter(u => u.vip && u.vip.active).map(u => ({ id: u.id, name: u.name, email: u.email, ...this.vipInfo(u) })); },
+
     // ---- Consumabile (catalog gestionat de admin) ----
     products() { return (db.products || []).slice(); },
     activeProducts() { return this.products().filter(p => p.active); },
@@ -2096,17 +2163,23 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       if (!loc || loc.status !== "approved") return { ok: false, error: "Alege o locație aprobată." };
       const slot = validateSlot(data.startTime, data.endTime);
       if (!slot.ok) return { ok: false, error: slot.error };
-      // ofertă de lansare: primele N curățenii primesc discount (blocat pe solicitare la creare)
-      const lo = CONFIG.launchOffer || {};
-      let launchDiscountPct = 0;
-      if (lo.active) {
-        const granted = db.requests.filter(r => (Number(r.launchDiscountPct) || 0) > 0).length;
-        if (granted < (lo.maxActions || 0)) launchDiscountPct = lo.discountPct || 0;
+      // discount: VIP (10% la fiecare solicitare) SAU ofertă de lansare (primele N) — nu se cumulează
+      const requester = this.currentUser();
+      let vipDiscountPct = 0, launchDiscountPct = 0;
+      if (this.isVipActive(requester)) {
+        vipDiscountPct = (CONFIG.vip || {}).discountPct || 0;
+      } else {
+        const lo = CONFIG.launchOffer || {};
+        if (lo.active) {
+          const granted = db.requests.filter(r => (Number(r.launchDiscountPct) || 0) > 0).length;
+          if (granted < (lo.maxActions || 0)) launchDiscountPct = lo.discountPct || 0;
+        }
       }
       const req = {
         id: uid("r"),
         requesterId: db.session,
         launchDiscountPct,   // discount ofertă de lansare (0 dacă nu se mai aplică)
+        vipDiscountPct,      // discount VIP (10% dacă are abonament activ)
         executorId: null,
         locationId: loc.id,
         area: loc.area,
@@ -3340,6 +3413,9 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         <!-- Întrebări frecvente -->
         ${faqSection("Întrebări frecvente", "Ce vor să știe proprietarii", "Răspunsuri clare despre prețuri, plată, garanție și cum decurge o curățenie în regim hotelier.", homeFaq, { soft: true, image: (window.SHOTS || {}).client, imageAlt: "Interfața solicitantului — trimitere solicitare nouă", imageCaption: "Interfața solicitantului: alegi locația, data, intervalul și lenjeria, apoi plătești în avans." })}
 
+        <!-- VIP Member -->
+        ${vipPromo()}
+
         <!-- Recomandă și câștigă -->
         ${referralPromo()}
 
@@ -3369,6 +3445,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
               <a data-scroll="servicii">Servicii</a>
               <a data-scroll="cum">Cum funcționează</a>
               <a data-scroll="preturi">Prețuri</a>
+              <a data-scroll="vip">👑 VIP Member</a>
               <a data-scroll="faq">Întrebări frecvente</a>
             </div>
             <div>
@@ -3433,7 +3510,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
       if (q.consumablesRon > 0) rows.push(`<div class="sb-row"><span>Consumabile (+${q.markupPct}% adaos)</span><span>≈ ${money(q.consumablesEur)}</span></div>`);
       if (q.urgentAdd) rows.push(`<div class="sb-row sur"><span>⚡ Urgență (+${q.urgentSurchargePct}%)</span><span>+${money(q.urgentAdd)}</span></div>`);
       if (q.refundableAdd) rows.push(`<div class="sb-row"><span>🔓 Rambursabil (+${q.refundableSurchargePct}%)</span><span>+${money(q.refundableAdd)}</span></div>`);
-      if (q.launchDiscount) rows.push(`<div class="sb-row disc"><span>🎉 Ofertă lansare (−${q.launchDiscountPct}%)</span><span>−${money(q.launchDiscount)}</span></div>`);
+      if (q.launchDiscount) rows.push(`<div class="sb-row disc"><span>${q.discountKind === "vip" ? "👑 Reducere VIP" : "🎉 Ofertă lansare"} (−${q.launchDiscountPct}%)</span><span>−${money(q.launchDiscount)}</span></div>`);
       $("#simBreakdown").innerHTML = rows.join("");
       $("#simTotal").innerHTML = `${money(q.total)} <small style="font-size:14px;color:var(--h-muted);font-weight:600">≈ ${leiOf(q.total)} lei</small>`;
       const peak = S.isPeak(d.startTime), wh = S.isWeekendOrHoliday(d.date);
@@ -3673,6 +3750,125 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
           </div>
         </div>
       </div></section>`;
+  }
+
+  /* ---------- VIP Member (abonament + card premium) ---------- */
+  function vipCardHtml(u) {
+    const info = S.vipInfo(u);
+    const until = info.until ? new Date(info.until).toLocaleDateString("ro-RO") : "—";
+    return `
+      <div class="vip-card ${info.active ? "active" : "inactive"}">
+        <div class="vip-shine"></div>
+        <div class="vip-row1"><span class="vip-crown">👑</span><span class="vip-brand">Sleep &amp; Go<small>VIP MEMBER</small></span><span class="vip-badge">${info.active ? "ACTIV" : "INACTIV"}</span></div>
+        <div class="vip-chip"></div>
+        <div class="vip-name">${esc(u.name)}</div>
+        <div class="vip-perk">−${info.discountPct}% la fiecare solicitare</div>
+        <div class="vip-foot"><span>${info.locations} ${info.locations === 1 ? "locație" : "locații"} · ${info.monthlyRon} lei/lună</span><span>${info.active ? "valabil până " + until : "neactivat"}</span></div>
+      </div>`;
+  }
+  function renderVipTab(u, body) {
+    const info = S.vipInfo(u);
+    const until = info.until ? new Date(info.until).toLocaleDateString("ro-RO") : "—";
+    const locLabel = info.locations === 1 ? "1 locație" : info.locations + " locații";
+    body.innerHTML = `
+      ${vipCardHtml(u)}
+      <div class="card" style="margin-top:16px">
+        ${info.active
+          ? `<strong style="font-size:17px">Ești VIP Member 👑</strong>
+             <p class="hint" style="margin:6px 0 0;color:var(--muted,#8aa)">Primești automat <strong>−${info.discountPct}%</strong> la fiecare solicitare. Abonament: <strong>${locLabel}</strong> · <strong>${info.monthlyRon} lei/lună</strong>. Valabil încă <strong>${info.daysLeft}</strong> zile (până la ${until}).</p>
+             <button class="btn" id="vipRenew" style="margin-top:12px">🔄 Prelungește o lună (${info.monthlyRon} lei)</button>`
+          : `<strong style="font-size:17px">Devino VIP Member</strong>
+             <ul style="margin:10px 0 0;padding-left:18px;line-height:1.9;color:var(--muted,#8aa)">
+               <li><strong style="color:inherit">−${info.discountPct}% la FIECARE solicitare</strong> (curățenie)</li>
+               <li>Card VIP premium în contul tău</li>
+               <li>Prioritate și beneficii pentru membri</li>
+             </ul>
+             <p style="margin:12px 0 0">Abonament: <strong>${info.monthlyRon} lei/lună</strong> pentru ${locLabel} — <span class="hint" style="color:var(--muted,#8aa)">100 lei prima locație + 50 lei/locație suplimentară, încasat în avans.</span></p>
+             <button class="btn btn-block" id="vipJoin" style="margin-top:14px">👑 Activează VIP — ${info.monthlyRon} lei/lună</button>`}
+      </div>`;
+    const join = body.querySelector("#vipJoin"); if (join) join.onclick = () => openVipPayment(u);
+    const renew = body.querySelector("#vipRenew"); if (renew) renew.onclick = () => openVipPayment(u);
+  }
+  async function openVipPayment(u) {
+    const info = S.vipInfo(u);
+    const locations = info.locations, monthlyRon = info.monthlyRon, monthlyEur = info.monthlyEur;
+    // 1) Stripe real (dacă serverul are chei)
+    if (S.mode && S.mode() === "api") {
+      toast("Se pregătește plata securizată…", "");
+      const res = await S.payVipCheckout(locations);
+      if (res && res.ok && res.url) { window.location.href = res.url; return; }
+      if (res && res.error && !["stripe_unconfigured", "demo"].includes(res.error)) return toast(res.error, "err");
+    }
+    // 2) Fallback simulat (mod demo / fără chei Stripe)
+    modal(`
+      <div class="stripe-head"><span class="stripe-logo">stripe</span><span class="stripe-test">TEST MODE</span></div>
+      <div class="stripe-amount"><span class="stripe-amt-label">Abonament VIP Member</span><span class="stripe-amt-value">${monthlyRon} lei ≈ ${money(monthlyEur)}</span></div>
+      <div class="summary" style="margin-bottom:16px">
+        <div class="line"><span>Plan VIP · ${locations} ${locations === 1 ? "locație" : "locații"}</span><span>${monthlyRon} lei</span></div>
+        <div class="line"><span>Beneficiu</span><span class="pill">−${info.discountPct}% / solicitare</span></div>
+        <div class="line total"><span>De plată acum (o lună, în avans)</span><span class="amt">${monthlyRon} lei ≈ ${money(monthlyEur)}</span></div>
+      </div>
+      <div class="field"><label>Informații card</label>
+        <div class="stripe-card">
+          <input id="vc_num" class="stripe-cardnum" placeholder="1234 1234 1234 1234" inputmode="numeric" maxlength="19"/>
+          <div class="stripe-card-row"><input id="vc_exp" placeholder="LL / AA" inputmode="numeric" maxlength="7"/><input id="vc_cvc" placeholder="CVC" inputmode="numeric" maxlength="4"/></div>
+        </div>
+        <div class="hint">Card de test: <span class="link" id="vcFill">4242 4242 4242 4242</span></div>
+      </div>
+      <button class="btn btn-block stripe-pay" id="vipPayBtn">Plătește ${monthlyRon} lei și activează VIP</button>
+      <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="_closeModal()">Renunță</button>
+      <p class="stripe-foot">🔒 Plată securizată prin Stripe. Abonamentul se încasează în avans pentru ${S.vipConfig().periodDays} de zile.</p>
+    `);
+    const num = $("#vc_num"), exp = $("#vc_exp"), cvc = $("#vc_cvc");
+    num.oninput = () => { let v = num.value.replace(/\D/g, "").slice(0, 16); num.value = v.replace(/(.{4})/g, "$1 ").trim(); };
+    exp.oninput = () => { let v = exp.value.replace(/\D/g, "").slice(0, 4); exp.value = v.length > 2 ? v.slice(0, 2) + " / " + v.slice(2) : v; };
+    cvc.oninput = () => { cvc.value = cvc.value.replace(/\D/g, "").slice(0, 4); };
+    $("#vcFill").onclick = () => { num.value = "4242 4242 4242 4242"; exp.value = "12 / 28"; cvc.value = "123"; };
+    $("#vipPayBtn").onclick = async () => {
+      if (num.value.replace(/\s/g, "").length < 12 || exp.value.replace(/\D/g, "").length < 4 || cvc.value.length < 3)
+        return toast("Completează datele cardului (test: 4242 4242 4242 4242).", "err");
+      const btn = $("#vipPayBtn"); btn.disabled = true; btn.textContent = "Se procesează…";
+      setTimeout(async () => {
+        const res = S.activateVip(locations);
+        if (MODE_flush()) { try { await S.flush(); } catch (e) {} }
+        closeModal();
+        if (res && res.ok) { toast("Bine ai venit în clubul VIP! 👑 Ai −" + info.discountPct + "% la fiecare solicitare.", "ok"); solTab = "vip"; renderSolicitant(u); }
+        else toast((res && res.error) || "Activare eșuată.", "err");
+      }, 1000);
+    };
+  }
+  function MODE_flush() { try { return S.mode && S.mode() === "api"; } catch (e) { return false; } }
+  // secțiune promo VIP pe home
+  function vipPromo() {
+    const c = S.vipConfig();
+    return `
+      <section class="h-section" id="vip"><div class="wrap">
+        <div class="vip-promo">
+          <div class="vip-promo-card">${vipPromoCardStatic()}</div>
+          <div class="vip-promo-text">
+            <div class="eyebrow">👑 Abonament premium</div>
+            <h2>Devino <span class="accent">VIP Member</span></h2>
+            <p>Ca membru VIP primești <strong>−${c.discountPct}% la fiecare solicitare</strong> de curățenie. Abonamentul costă <strong>${c.baseRon} lei/lună</strong> pentru prima locație și <strong>+${c.extraRon} lei/lună</strong> pentru fiecare locație în plus. Se încasează în avans, plată securizată prin Stripe.</p>
+            <ul class="vip-promo-list">
+              <li>✅ −${c.discountPct}% la toate curățeniile</li>
+              <li>✅ Card VIP premium în contul tău</li>
+              <li>✅ Fără costuri ascunse — anulezi oricând</li>
+            </ul>
+            <div class="cta-row"><button class="h-btn primary lg" data-go="register">👑 Devino VIP</button><button class="h-btn ghost lg" data-go="login">Am deja cont</button></div>
+          </div>
+        </div>
+      </div></section>`;
+  }
+  function vipPromoCardStatic() {
+    return `
+      <div class="vip-card active" style="margin:0">
+        <div class="vip-shine"></div>
+        <div class="vip-row1"><span class="vip-crown">👑</span><span class="vip-brand">Sleep &amp; Go<small>VIP MEMBER</small></span><span class="vip-badge">ACTIV</span></div>
+        <div class="vip-chip"></div>
+        <div class="vip-name">Numele tău</div>
+        <div class="vip-perk">−${S.vipConfig().discountPct}% la fiecare solicitare</div>
+        <div class="vip-foot"><span>de la ${S.vipConfig().baseRon} lei/lună</span><span>membru premium</span></div>
+      </div>`;
   }
 
   /* ---------- SEO / AEO / GEO: meta tags + Open Graph + JSON-LD ---------- */
@@ -4593,6 +4789,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         <button data-t="expenses" class="${solTab === "expenses" ? "active" : ""}">💶 Cheltuieli</button>
         <button data-t="linen" class="${solTab === "linen" ? "active" : ""}">🧺 Lenjeria mea</button>
         <button data-t="referral" class="${solTab === "referral" ? "active" : ""}">🎁 Recomandă</button>
+        <button data-t="vip" class="${solTab === "vip" ? "active" : ""}">👑 VIP${S.isVipActive(u) ? " ✓" : ""}</button>
       </div>
       <div id="solBody"></div>
     `));
@@ -4604,6 +4801,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     else if (solTab === "expenses") renderMyExpenses(u);
     else if (solTab === "linen") renderMyLinen(u);
     else if (solTab === "referral") { $("#solBody").innerHTML = referralPanel(u); wireReferral($("#solBody")); }
+    else if (solTab === "vip") { renderVipTab(u, $("#solBody")); }
     else renderMyRequests(u);
   }
 
@@ -4746,7 +4944,10 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
       const refundable = !!(form.reqRefundable && form.reqRefundable.checked);
       const urgent = !!(form.reqUrgent && form.reqUrgent.checked);
       const loInfo = S.launchOfferInfo();
-      const draft = { sqm, linens: withLinen, linenSets, startTime, consumables, date: reqDate, refundable, urgent, launchDiscountPct: loInfo.active ? loInfo.discountPct : 0 };
+      const isVip = S.isVipActive(u);
+      const draft = { sqm, linens: withLinen, linenSets, startTime, consumables, date: reqDate, refundable, urgent,
+        vipDiscountPct: isVip ? S.vipConfig().discountPct : 0,
+        launchDiscountPct: (!isVip && loInfo.active) ? loInfo.discountPct : 0 };
       const p = S.priceOf(draft);
       $("#linenNote").textContent = withLinen
         ? `Se plătește ${C.linenSetPriceRon} lei/set. Agentul Cleaning o poate spăla și călca.`
@@ -4762,7 +4963,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         ${p.consumablesRon > 0 ? `<div class="line"><span>Consumabile (achiziție ${p.consumablesCostRon} + ${p.markupPct}% adaos)</span><span>${p.consumablesRon} lei ≈ ${money(p.consumablesEur)}</span></div>` : ""}
         ${p.urgentAdd ? `<div class="line" style="color:var(--warn)"><span>⚡ Urgență (+${p.urgentSurchargePct}%)</span><span>+${money(p.urgentAdd)}</span></div>` : ""}
         ${p.refundableAdd ? `<div class="line" style="color:var(--brand)"><span>🔓 Opțiune rambursabilă (+${p.refundableSurchargePct}%)</span><span>+${money(p.refundableAdd)}</span></div>` : ""}
-        ${p.launchDiscount ? `<div class="line" style="color:#0a7d3f"><span>🎉 Ofertă de lansare (−${p.launchDiscountPct}%)</span><span>−${money(p.launchDiscount)}</span></div>` : ""}
+        ${p.launchDiscount ? `<div class="line" style="color:#0a7d3f"><span>${p.discountKind === "vip" ? "👑 Reducere VIP" : "🎉 Ofertă de lansare"} (−${p.launchDiscountPct}%)</span><span>−${money(p.launchDiscount)}</span></div>` : ""}
         <div class="line total"><span>Total de plată</span><span class="amt">${moneyBoth(p.total)}</span></div>`;
     };
 
@@ -5010,7 +5211,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         ${b.consumablesRon > 0 ? `<div class="line"><span>Consumabile (cu ${b.markupPct}% adaos)</span><span>${b.consumablesRon} lei ≈ ${money(b.consumablesEur)}</span></div>` : ""}
         ${b.urgentAdd ? `<div class="line" style="color:var(--warn)"><span>⚡ Urgență (+${b.urgentSurchargePct}%)</span><span>+${money(b.urgentAdd)}</span></div>` : ""}
         ${b.refundableAdd ? `<div class="line" style="color:var(--brand)"><span>🔓 Rambursabil (+${b.refundableSurchargePct}%)</span><span>+${money(b.refundableAdd)}</span></div>` : ""}
-        ${b.launchDiscount ? `<div class="line" style="color:#0a7d3f"><span>🎉 Ofertă de lansare (−${b.launchDiscountPct}%)</span><span>−${money(b.launchDiscount)}</span></div>` : ""}
+        ${b.launchDiscount ? `<div class="line" style="color:#0a7d3f"><span>${b.discountKind === "vip" ? "👑 Reducere VIP" : "🎉 Ofertă de lansare"} (−${b.launchDiscountPct}%)</span><span>−${money(b.launchDiscount)}</span></div>` : ""}
         ${credit > 0 ? `<div class="line" style="color:#0a7d3f"><span>🎁 Credit recomandări</span><span>−${money(credit)}</span></div>` : ""}
         <div class="line"><span>Interval ${esc(r.date)} · ${esc(r.startTime)}–${esc(r.endTime)}</span><span></span></div>
         <div class="line total"><span>${credit > 0 ? "De plătit cu cardul" : "Total de plată"}</span><span class="amt">${moneyBoth(due)}</span></div>
@@ -5477,6 +5678,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     const roleReqCount = S.pendingRoleRequests().length;
     const newsCount = S.newsletterSubs().filter(s => !s.unsubscribed).length;
     const refPend = S.referrers().filter(r => r.eligible).length;
+    const vipCount = S.vipMembers().length;
     app.appendChild(el(`
       <div class="page-head">
         <h1>Panou administrare</h1>
@@ -5495,6 +5697,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         <button data-t="blog" class="${adminTab === "blog" ? "active" : ""}">📝 Blog</button>
         <button data-t="newsletter" class="${adminTab === "newsletter" ? "active" : ""}">📧 Newsletter${newsCount ? ` (${newsCount})` : ""}</button>
         <button data-t="referral" class="${adminTab === "referral" ? "active" : ""}">🎁 Referral${refPend ? ` <span class="tab-alert">${refPend}</span>` : ""}</button>
+        <button data-t="vip" class="${adminTab === "vip" ? "active" : ""}">👑 VIP${vipCount ? ` (${vipCount})` : ""}</button>
       </div>
       <div id="admBody"></div>
     `));
@@ -5510,6 +5713,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     else if (adminTab === "blog") renderAdminBlog(u);
     else if (adminTab === "newsletter") renderAdminNewsletter(u);
     else if (adminTab === "referral") renderAdminReferral(u);
+    else if (adminTab === "vip") renderAdminVip(u);
     else renderAdminUsers();
   }
 
@@ -5715,6 +5919,37 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
       const res = await S.refPayout(b.dataset.id);
       if (res && res.ok) { toast("Virare înregistrată.", "ok"); renderAdmin(u); } else toast((res && res.error) || "Eroare.", "err");
     });
+  }
+
+  /* ---- Admin: VIP Members ---- */
+  function renderAdminVip(u) {
+    const body = $("#admBody");
+    const c = S.vipConfig();
+    const members = S.vipMembers();
+    const muted = "var(--muted,#8aa)";
+    const monthlyTotalRon = members.reduce((s, m) => s + (m.monthlyRon || 0), 0);
+    body.innerHTML = `
+      <div class="card" style="margin-bottom:14px">
+        <strong>👑 VIP Members</strong>
+        <p class="hint" style="margin:4px 0 0;color:${muted}">Membrii VIP primesc <strong>−${c.discountPct}%</strong> la fiecare solicitare. Abonament: <strong>${c.baseRon} lei/lună</strong> prima locație + <strong>${c.extraRon} lei/lună</strong> pentru fiecare locație suplimentară, încasat în avans prin Stripe.</p>
+        <div class="news-counts">
+          <div class="nc"><span class="nc-n">${members.length}</span><span class="nc-l">membri activi</span></div>
+          <div class="nc total"><span class="nc-n">${monthlyTotalRon} lei</span><span class="nc-l">venit lunar VIP</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <strong>Listă membri</strong>
+        <div style="margin-top:10px">${members.length ? `<div class="subs-table">${members.map(m => {
+          const until = m.until ? new Date(m.until).toLocaleDateString("ro-RO") : "—";
+          return `<div class="subs-row">
+            <div class="sr-main"><strong>${esc(m.name)}</strong>${m.email ? " · " + esc(m.email) : ""}
+              <div class="hint" style="color:${muted};margin-top:2px">${m.locations} ${m.locations === 1 ? "locație" : "locații"} · ${m.monthlyRon} lei/lună · valabil până ${until} (${m.daysLeft} zile)</div>
+            </div>
+            <div class="sr-meta"><span class="badge ok">👑 VIP activ</span></div>
+          </div>`;
+        }).join("")}</div>` : `<p class="hint" style="color:${muted}">Niciun membru VIP încă.</p>`}</div>
+      </div>
+    `;
   }
 
   function blogEditModal(post) {
@@ -7252,12 +7487,17 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     const sessionId = params.get("session_id");
     const paidId = params.get("paid");
     const cancelId = params.get("paycancel");
-    if (!sessionId && !paidId && !cancelId) return;
+    const vipReturn = params.get("vip");
+    const vipCancel = params.get("vipcancel");
+    if (!sessionId && !paidId && !cancelId && !vipReturn && !vipCancel) return;
     history.replaceState({}, "", location.pathname);   // curăță URL-ul
-    if (cancelId) { toast("Plată anulată. Poți relua din «Solicitările mele».", ""); return; }
+    if (cancelId || vipCancel) { toast("Plată anulată.", ""); return; }
     if (sessionId) {
       const res = await S.verifyPayment(sessionId);
-      if (res && res.ok && res.paid) {
+      if (res && res.ok && res.paid && res.vip) {
+        await S.refresh();
+        toast("Bine ai venit în clubul VIP! 👑", "ok");
+      } else if (res && res.ok && res.paid) {
         await S.refresh();
         toast("Plată confirmată! Solicitarea e vizibilă Agenților Cleaning.", "ok");
       } else {
