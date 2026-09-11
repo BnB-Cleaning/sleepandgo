@@ -977,11 +977,14 @@ app.post("/api/ref/payout", async (req, res) => {
     const me = (st.users || []).find(u => u.id === uidReq);
     if (!me || me.role !== "admin") return res.status(403).json({ ok: false, error: "Doar administratorul." });
     const userId = req.body && req.body.userId;
+    const target = (st.users || []).find(u => u.id === userId);
+    const iban = target ? (target.refIban || (target.business && target.business.iban) || "") : "";
+    if (!iban) return res.json({ ok: false, error: "Utilizatorul nu are IBAN setat — nu se poate vira." });
     const r = ensureReferrals(st);
     const avail = refAvailable(st, userId);          // doar soldul rămas (după credit cheltuit)
     r.paid[userId] = round2((Number(r.paid[userId]) || 0) + Math.max(0, avail));
     await saveState(st);
-    res.json({ ok: true, paid: Math.max(0, avail) });
+    res.json({ ok: true, paid: Math.max(0, avail), iban });
   } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 // Solicitantul folosește creditul din recomandări pentru a plăti (parțial/integral) o solicitare

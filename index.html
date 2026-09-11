@@ -1796,13 +1796,24 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       const spent = round2(R.spent[u.id] || 0);
       const available = round2(earned - paid - spent);   // sold de folosit (cash la 50€ sau credit servicii)
       return {
-        code: this.myRefCode(u), link: this.refLink(u),
+        code: this.myRefCode(u), link: this.refLink(u), iban: this.refIban(u),
         clicks: R.clicks[this.myRefCode(u)] || 0,
         earned, paid, spent, available, pending: available, credits: mine.length,
         eligible: available >= this.REF_PAYOUT_EUR, threshold: this.REF_PAYOUT_EUR,
       };
     },
     refAvailable(u) { return u ? this.refStats(u).available : 0; },
+    // IBAN pentru virarea câștigurilor din recomandări (fallback: IBAN-ul firmei, dacă există)
+    refIban(u) { return (u && (u.refIban || (u.business && u.business.iban))) || ""; },
+    async setRefIban(iban) {
+      const u = this.currentUser(); if (!u) return { ok: false, error: "Neautentificat." };
+      const clean = String(iban || "").replace(/\s+/g, "").toUpperCase();
+      if (clean && !/^RO\d{2}[A-Z0-9]{16,30}$/.test(clean)) return { ok: false, error: "IBAN invalid (format: RO urmat de 22–32 caractere)." };
+      this.updateUser(u.id, { refIban: clean });
+      if (MODE === "api") { try { await this.flush(); } catch (e) {} }
+      return { ok: true, iban: clean };
+    },
+    refClicksTotal() { const R = this._ensureReferrals(); return Object.values(R.clicks).reduce((s, n) => s + (Number(n) || 0), 0); },
     // solicitantul folosește creditul din recomandări pt. o solicitare (parțial/integral)
     async redeemReferral(reqId) {
       if (MODE === "api") {
@@ -1845,15 +1856,17 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         if (!localStorage.getItem(flag)) { await this.recordRefClick(code); localStorage.setItem(flag, "1"); }
       } catch (e) {}
     },
-    // admin: toți cei cu câștiguri din recomandări
+    // admin: toți cei cu câștiguri SAU cu clicuri pe link (pentru statistici complete)
     referrers() {
       const R = this._ensureReferrals();
-      const ids = [...new Set(R.ledger.map(e => e.referrerId))];
+      const earners = R.ledger.map(e => e.referrerId);
+      const clickers = (db.users || []).filter(u => u.refCode && (R.clicks[u.refCode] || 0) > 0).map(u => u.id);
+      const ids = [...new Set([...earners, ...clickers])];
       return ids.map(id => {
         const u = this.userById(id);
-        const st = u ? this.refStats(u) : { earned: 0, paid: 0, pending: 0, credits: 0, eligible: false };
+        const st = u ? this.refStats(u) : { earned: 0, paid: 0, spent: 0, pending: 0, clicks: 0, credits: 0, eligible: false, iban: "" };
         return { id, name: u ? u.name : id, email: u ? u.email : "", role: u ? u.role : "", ...st };
-      }).sort((a, b) => b.pending - a.pending);
+      }).sort((a, b) => (b.pending - a.pending) || (b.clicks - a.clicks));
     },
     async refPayout(userId) {
       if (MODE === "api") {
@@ -1861,8 +1874,10 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         if (r && r.ok) { try { await refreshState(); } catch (e) {} }
         return r || { ok: false };
       }
+      // local: virează doar soldul disponibil (după creditul cheltuit pe servicii)
       const R = this._ensureReferrals(); const u = this.userById(userId);
-      R.paid[userId] = u ? this.refStats(u).earned : 0; save(db); return { ok: true };
+      const avail = u ? this.refStats(u).available : 0;
+      R.paid[userId] = round2((Number(R.paid[userId]) || 0) + Math.max(0, avail)); save(db); return { ok: true };
     },
 
     // ---- Consumabile (catalog gestionat de admin) ----
@@ -3600,12 +3615,18 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
           <div class="rs hi"><span class="rs-n">${money(st.pending)}</span><span class="rs-l">de încasat</span></div>
         </div>
         <div class="ref-prog" title="${money(st.pending)} din ${st.threshold} €"><div class="ref-prog-bar" style="width:${pct}%"></div></div>
+        <label class="ref-lbl" style="margin-top:14px">IBAN pentru virarea câștigurilor</label>
+        <div class="ref-linkbar">
+          <input id="refIban" value="${esc(st.iban)}" placeholder="RO00 BANK 0000 0000 0000 0000" autocomplete="off" />
+          <button class="btn" id="refIbanSave">💾 Salvează IBAN</button>
+        </div>
+        <p class="hint" style="color:var(--muted,#8aa);margin:0 0 10px">Câștigurile din recomandări se virează <strong>doar pe IBAN</strong> (nu în numerar), după ce ajung la ${st.threshold} €.${st.iban ? "" : " Adaugă-ți IBAN-ul ca să poți primi banii."}</p>
         ${u.role === "solicitant"
-          ? `<p class="hint ref-note" style="color:#0a7d3f;font-weight:600">💡 Poți folosi acest sold pentru a-ți plăti serviciile — se oferă automat la plata unei solicitări.${st.spent > 0 ? ` (Ai folosit deja ${money(st.spent)}.)` : ""}</p>
-             <p class="hint" style="color:var(--muted,#8aa);margin-top:4px">Sau îl încasezi cash când ajunge la ${st.threshold} € (${st.eligible ? "atins ✅" : "încă " + money(Math.max(0, st.threshold - st.pending))}).</p>`
+          ? `<p class="hint ref-note" style="color:#0a7d3f;font-weight:600">💡 Poți folosi acest sold și pentru a-ți plăti serviciile — se oferă automat la plata unei solicitări.${st.spent > 0 ? ` (Ai folosit deja ${money(st.spent)}.)` : ""}</p>
+             <p class="hint" style="color:var(--muted,#8aa);margin-top:4px">Sau se virează pe IBAN când ajunge la ${st.threshold} € (${st.eligible ? "atins ✅" : "încă " + money(Math.max(0, st.threshold - st.pending))}).</p>`
           : `<p class="hint ref-note" style="color:var(--muted,#8aa)">${st.eligible
-              ? `✅ Ai atins pragul de ${st.threshold} € — plata se procesează de administrator.`
-              : `Încă <strong>${money(Math.max(0, st.threshold - st.pending))}</strong> până la pragul de plată de ${st.threshold} €.`}</p>`}
+              ? `✅ Ai atins pragul de ${st.threshold} € — se virează pe IBAN de către administrator.`
+              : `Încă <strong>${money(Math.max(0, st.threshold - st.pending))}</strong> până la pragul de virare de ${st.threshold} €.`}</p>`}
       </div>`;
   }
   function wireReferral(root) {
@@ -3622,6 +3643,15 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
       const i = root.querySelector("#refLink"); const url = i ? i.value : "";
       if (navigator.share) { try { await navigator.share({ title: "Sleep & Go Cleaning", text: "Îți recomand Sleep & Go Cleaning 🧽", url }); } catch (e) {} }
       else { try { navigator.clipboard.writeText(url); toast("Link copiat!", "ok"); } catch (e) {} }
+    };
+    const ibanBtn = root.querySelector("#refIbanSave");
+    if (ibanBtn) ibanBtn.onclick = async () => {
+      const inp = root.querySelector("#refIban"); if (!inp) return;
+      ibanBtn.disabled = true;
+      const res = await S.setRefIban(inp.value);
+      ibanBtn.disabled = false;
+      if (res && res.ok) { toast(res.iban ? "IBAN salvat." : "IBAN șters.", "ok"); }
+      else toast((res && res.error) || "IBAN invalid.", "err");
     };
   }
   // secțiune promo pe landing-uri (logat sau nu) — evidențiază programul
@@ -5645,14 +5675,16 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     const muted = "var(--muted,#8aa)";
     const totalPending = list.reduce((s, r) => s + r.pending, 0);
     const totalEarned = list.reduce((s, r) => s + r.earned, 0);
+    const totalClicks = S.refClicksTotal();
     body.innerHTML = `
       <div class="card" style="margin-bottom:14px">
         <strong>🎁 Program de recomandare</strong>
-        <p class="hint" style="margin:4px 0 0;color:${muted}">Fiecare cont are un link unic. Recomandantul primește <strong>${S.REF_PCT}%</strong> din comision pentru primele <strong>${S.REF_CAP}</strong> acțiuni ale celui recomandat (solicitări finalizate / lucrări executate). Plata se face la <strong>${S.REF_PAYOUT_EUR} €</strong>.</p>
+        <p class="hint" style="margin:4px 0 0;color:${muted}">Fiecare cont are un link unic. Recomandantul primește <strong>${S.REF_PCT}%</strong> din comision pentru primele <strong>${S.REF_CAP}</strong> acțiuni ale celui recomandat. Câștigurile se virează <strong>doar pe IBAN</strong> (nu în numerar), la <strong>${S.REF_PAYOUT_EUR} €</strong>.</p>
         <div class="news-counts">
           <div class="nc"><span class="nc-n">${list.length}</span><span class="nc-l">recomandanți</span></div>
+          <div class="nc"><span class="nc-n">${totalClicks}</span><span class="nc-l">clicuri totale</span></div>
           <div class="nc"><span class="nc-n">${money(totalEarned)}</span><span class="nc-l">câștig total</span></div>
-          <div class="nc total"><span class="nc-n">${money(totalPending)}</span><span class="nc-l">de plătit</span></div>
+          <div class="nc total"><span class="nc-n">${money(totalPending)}</span><span class="nc-l">de virat</span></div>
         </div>
       </div>
 
@@ -5662,21 +5694,26 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
       </div>
 
       <div class="card">
-        <strong>Recomandanți &amp; solduri</strong>
+        <strong>Recomandanți, clicuri &amp; IBAN</strong>
         <div id="refList" style="margin-top:10px">${list.length ? `<div class="subs-table">${list.map(r => `
           <div class="subs-row">
-            <div class="sr-main"><strong>${esc(r.name)}</strong>${r.email ? " · " + esc(r.email) : ""} <span class="hint" style="color:${muted}">(${r.credits} acțiuni · ${r.clicks} clicuri)</span></div>
-            <div class="sr-meta"><span class="hint" style="color:${muted}">câștig ${money(r.earned)} · plătit ${money(r.paid)}</span><span class="badge${r.eligible ? " ok" : ""}">${money(r.pending)} de încasat</span></div>
-            <button class="btn btn-sm refPay" data-id="${esc(r.id)}" ${r.pending <= 0 ? "disabled" : ""}>${r.eligible ? "💸 Marchează plătit" : "Plătește oricum"}</button>
-          </div>`).join("")}</div>` : `<p class="hint" style="color:${muted}">Niciun câștig din recomandări încă.</p>`}</div>
+            <div class="sr-main">
+              <strong>${esc(r.name)}</strong>${r.email ? " · " + esc(r.email) : ""}
+              <div class="hint" style="color:${muted};margin-top:2px">🖱️ ${r.clicks} clicuri · ${r.credits} acțiuni creditate · câștig ${money(r.earned)} · virat ${money(r.paid)}</div>
+              <div class="hint" style="margin-top:2px">🏦 IBAN: ${r.iban ? `<strong>${esc(r.iban)}</strong>` : `<span style="color:var(--err,#c33)">nesetat</span>`}</div>
+            </div>
+            <div class="sr-meta"><span class="badge${r.eligible ? " ok" : ""}">${money(r.pending)} de virat</span></div>
+            <button class="btn btn-sm refPay" data-id="${esc(r.id)}" ${(r.pending <= 0 || !r.iban) ? "disabled" : ""} title="${!r.iban ? "Utilizatorul nu are IBAN setat" : ""}">💸 Virează pe IBAN</button>
+          </div>`).join("")}</div>` : `<p class="hint" style="color:${muted}">Niciun recomandant încă (fără clicuri sau câștiguri).</p>`}</div>
       </div>
     `;
     wireReferral(body);
     body.querySelectorAll(".refPay").forEach(b => b.onclick = async () => {
       const r = S.referrers().find(x => x.id === b.dataset.id); if (!r) return;
-      if (!confirm(`Marchezi ca plătit ${money(r.pending)} către ${r.name}?`)) return;
+      if (!r.iban) return toast("Utilizatorul nu are IBAN setat.", "err");
+      if (!confirm(`Confirmi virarea a ${money(r.pending)} către ${r.name} pe IBAN ${r.iban}?`)) return;
       const res = await S.refPayout(b.dataset.id);
-      if (res && res.ok) { toast("Plată înregistrată.", "ok"); renderAdmin(u); } else toast((res && res.error) || "Eroare.", "err");
+      if (res && res.ok) { toast("Virare înregistrată.", "ok"); renderAdmin(u); } else toast((res && res.error) || "Eroare.", "err");
     });
   }
 
