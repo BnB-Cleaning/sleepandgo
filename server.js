@@ -95,7 +95,10 @@ function priceOfServer(req, st) {
   // opțiuni cu suprataxă — EXCLUSIVE (nu se cumulează): urgența are prioritate dacă ambele apar
   const urgentAddEur = req.urgent ? round2(baseEur * PRICE.urgentSurchargePct / 100) : 0;
   const refundableAddEur = (req.refundable && !req.urgent) ? round2(baseEur * PRICE.refundableSurchargePct / 100) : 0;
-  const totalEur = round2(baseEur + refundableAddEur + urgentAddEur);
+  // discount ofertă de lansare (blocat pe solicitare la creare) — suportat din comisionul adminului
+  const launchPct = Number(req.launchDiscountPct) || 0;
+  const launchDiscountEur = launchPct ? round2(cleaningNet * launchPct / 100) : 0;
+  const totalEur = round2(baseEur + refundableAddEur + urgentAddEur - launchDiscountEur);
   const totalRon = Math.round(totalEur * ronPerEur);   // lei afișați clientului
   return { totalEur, totalRon, baniRon: totalRon * 100 };
 }

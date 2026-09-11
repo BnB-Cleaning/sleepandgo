@@ -887,6 +887,16 @@ body.landing-active { background: var(--h-bg); }
 .ref-promo-steps .rps-n { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--h-blue); color: #fff; font-weight: 800; font-size: 14px; font-family: "Poppins", sans-serif; }
 @media (max-width: 640px){ .ref-promo { padding: 26px 22px; } }
 
+/* ===== Bandă ofertă de lansare (home) ===== */
+.h-offer { background: linear-gradient(90deg, #0a7d3f, #12b866); color: #fff; }
+.h-offer .wrap { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 11px 24px; }
+.h-offer .ho-badge { font-weight: 800; font-family: "Poppins", sans-serif; font-size: 14px; white-space: nowrap; }
+.h-offer .ho-text { flex: 1 1 260px; font-size: 14px; line-height: 1.45; }
+.h-offer .ho-text strong { font-weight: 800; }
+.h-offer .ho-cta { flex: 0 0 auto; background: #fff; color: #0a7d3f; border: none; font-weight: 800; font-family: "Poppins", sans-serif; font-size: 13px; padding: 9px 16px; border-radius: 999px; cursor: pointer; transition: transform .15s ease; }
+.h-offer .ho-cta:hover { transform: translateY(-1px); }
+.sim-breakdown .sb-row.disc { color: #0a7d3f; font-weight: 700; }
+
 </style>
 
   <header class="topbar" id="topbar" hidden>
@@ -952,6 +962,9 @@ body.landing-active { background: var(--h-bg); }
     // de 21:00 cu o zi înainte); costă +30%. Intervalul rămâne în programul de lucru.
     urgentSurchargePct: 40,          // +40% pentru solicitarea de urgență
     urgentMinLeadHours: 5,           // se poate plasa cu minim 5 ore înainte de ora de începere
+    // Ofertă de LANSARE: primele N curățenii primesc un discount, suportat din comisionul adminului
+    // (plata Agentului Cleaning rămâne neschimbată — reducerea iese din comisionul platformei).
+    launchOffer: { active: true, discountPct: 10, maxActions: 10 },
     // Sărbători legale România (fixe, format „LL-ZZ"). Paștele/Rusaliile sunt mobile (neincluse).
     legalHolidays: ["01-01", "01-02", "01-24", "05-01", "06-01", "08-15", "11-30", "12-01", "12-25", "12-26"],
     // limită de dimensiune pentru documentul de suprafață (demo, salvat în localStorage)
@@ -1294,7 +1307,10 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     const refundable = !!req.refundable && !urgent;   // rambursabilă doar dacă nu e urgentă
     const urgentAdd = urgent ? round2(baseTotal * CONFIG.urgentSurchargePct / 100) : 0;
     const refundableAdd = refundable ? round2(baseTotal * CONFIG.refundableSurchargePct / 100) : 0;
-    const total = round2(baseTotal + refundableAdd + urgentAdd);
+    // discount ofertă de lansare — aplicat la curățenie; suportat din comisionul adminului
+    const launchDiscountPct = Number(req.launchDiscountPct) || 0;
+    const launchDiscount = launchDiscountPct ? round2(cleaningNet * launchDiscountPct / 100) : 0;
+    const total = round2(baseTotal + refundableAdd + urgentAdd - launchDiscount);
     return {
       cleaning, peakPct, peakAdd, surPct, surcharge, cleaningNet,
       linenIncluded: !!req.linens, linenSets, linenRon, linenEur,
@@ -1302,6 +1318,7 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       serviceTotal, baseTotal,
       refundable, refundableAdd, refundableSurchargePct: CONFIG.refundableSurchargePct,
       urgent, urgentAdd, urgentSurchargePct: CONFIG.urgentSurchargePct,
+      launchDiscountPct, launchDiscount,
       total,
     };
   }
@@ -1342,7 +1359,8 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     const optionsCommission = round2(((p.urgentAdd || 0) + (p.refundableAdd || 0)) * pct / 100);
 
     // comision total al platformei = comision servicii + partea admin din consumabile + comisionul din prime
-    const commission = round2(p.serviceTotal * pct / 100 + consAdminTotal + optionsCommission);
+    // − discountul de lansare (suportat integral din comisionul adminului; plata agentului rămâne aceeași)
+    const commission = round2(p.serviceTotal * pct / 100 + consAdminTotal + optionsCommission - (p.launchDiscount || 0));
 
     // plata Agentului Cleaning = curățenie + 50% adaos consumabile (+ lenjerie dacă a preluat-o el) + partea din prime
     const payout = round2(cleaningPayout + consExecutantPayout + (linenTaken ? linenPayout : 0) + optionsAgent);
@@ -1403,7 +1421,15 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         consumables: data.consumables || [],
         refundable: !!data.refundable,
         urgent: !!data.urgent,
+        launchDiscountPct: Number(data.launchDiscountPct) || 0,
       });
+    },
+    // info despre oferta de lansare (pentru bannerul din home + simulator)
+    launchOfferInfo() {
+      const lo = CONFIG.launchOffer || {};
+      const granted = (db.requests || []).filter(r => (Number(r.launchDiscountPct) || 0) > 0).length;
+      const remaining = Math.max(0, (lo.maxActions || 0) - granted);
+      return { active: !!lo.active && remaining > 0, discountPct: lo.discountPct || 0, maxActions: lo.maxActions || 0, granted, remaining };
     },
     // cereri de ofertă din simulatorul de pe home
     offerLeads() { return (db.offerLeads || []).slice().sort((a, b) => b.createdAt - a.createdAt); },
@@ -2027,9 +2053,17 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       if (!loc || loc.status !== "approved") return { ok: false, error: "Alege o locație aprobată." };
       const slot = validateSlot(data.startTime, data.endTime);
       if (!slot.ok) return { ok: false, error: slot.error };
+      // ofertă de lansare: primele N curățenii primesc discount (blocat pe solicitare la creare)
+      const lo = CONFIG.launchOffer || {};
+      let launchDiscountPct = 0;
+      if (lo.active) {
+        const granted = db.requests.filter(r => (Number(r.launchDiscountPct) || 0) > 0).length;
+        if (granted < (lo.maxActions || 0)) launchDiscountPct = lo.discountPct || 0;
+      }
       const req = {
         id: uid("r"),
         requesterId: db.session,
+        launchDiscountPct,   // discount ofertă de lansare (0 dacă nu se mai aplică)
         executorId: null,
         locationId: loc.id,
         area: loc.area,
@@ -2990,6 +3024,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
     // zonele în care există cel puțin un Agent Cleaning activ
     const coveredAreas = C.areas.filter(a => S.hasActiveExecutorInArea(a));
+    const lo = S.launchOfferInfo();   // ofertă de lansare (primele N curățenii cu discount)
     const services = [
       ["🛏️", "Curățenie regim hotelier", "Turnover complet între check-out și check-in: curățenie, schimbat lenjeria, pregătit locația pentru următorii oaspeți."],
       ["🧻", "Alimentare consumabile", "Hârtie igienică, apă, cafea, bomboane și produse de curățenie — reaprovizionare la fiecare intervenție."],
@@ -3009,6 +3044,11 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     ];
     app.appendChild(el(`
       <div class="home">
+        ${lo.active ? `<div class="h-offer"><div class="wrap">
+          <span class="ho-badge">🎉 Ofertă de lansare</span>
+          <span class="ho-text">Primele <strong>${lo.maxActions}</strong> curățenii primesc <strong>${lo.discountPct}% reducere</strong> — suportată integral din comisionul platformei (Agenții Cleaning încasează normal). Au mai rămas <strong>${lo.remaining}</strong> din ${lo.maxActions}.</span>
+          <button class="ho-cta" data-go="register">Profită acum</button>
+        </div></div>` : ""}
         <!-- Utility bar -->
         <div class="h-utility"><div class="wrap">
           <a class="phone" href="tel:${PHONE.replace(/\./g, "")}">📞 SUNĂ: ${PHONE}</a>
@@ -3334,6 +3374,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         consumables: readSimConsumables(),
         refundable: !!($("#simRefundable") && $("#simRefundable").checked),
         urgent: !!($("#simUrgent") && $("#simUrgent").checked),
+        launchDiscountPct: lo.active ? lo.discountPct : 0,   // estimare ofertă de lansare
       };
     };
     function recalcSim() {
@@ -3349,6 +3390,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
       if (q.consumablesRon > 0) rows.push(`<div class="sb-row"><span>Consumabile (+${q.markupPct}% adaos)</span><span>≈ ${money(q.consumablesEur)}</span></div>`);
       if (q.urgentAdd) rows.push(`<div class="sb-row sur"><span>⚡ Urgență (+${q.urgentSurchargePct}%)</span><span>+${money(q.urgentAdd)}</span></div>`);
       if (q.refundableAdd) rows.push(`<div class="sb-row"><span>🔓 Rambursabil (+${q.refundableSurchargePct}%)</span><span>+${money(q.refundableAdd)}</span></div>`);
+      if (q.launchDiscount) rows.push(`<div class="sb-row disc"><span>🎉 Ofertă lansare (−${q.launchDiscountPct}%)</span><span>−${money(q.launchDiscount)}</span></div>`);
       $("#simBreakdown").innerHTML = rows.join("");
       $("#simTotal").innerHTML = `${money(q.total)} <small style="font-size:14px;color:var(--h-muted);font-weight:600">≈ ${leiOf(q.total)} lei</small>`;
       const peak = S.isPeak(d.startTime), wh = S.isWeekendOrHoliday(d.date);
@@ -4642,7 +4684,8 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
       const reqDate = f.get("date");
       const refundable = !!(form.reqRefundable && form.reqRefundable.checked);
       const urgent = !!(form.reqUrgent && form.reqUrgent.checked);
-      const draft = { sqm, linens: withLinen, linenSets, startTime, consumables, date: reqDate, refundable, urgent };
+      const loInfo = S.launchOfferInfo();
+      const draft = { sqm, linens: withLinen, linenSets, startTime, consumables, date: reqDate, refundable, urgent, launchDiscountPct: loInfo.active ? loInfo.discountPct : 0 };
       const p = S.priceOf(draft);
       $("#linenNote").textContent = withLinen
         ? `Se plătește ${C.linenSetPriceRon} lei/set. Agentul Cleaning o poate spăla și călca.`
@@ -4658,6 +4701,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         ${p.consumablesRon > 0 ? `<div class="line"><span>Consumabile (achiziție ${p.consumablesCostRon} + ${p.markupPct}% adaos)</span><span>${p.consumablesRon} lei ≈ ${money(p.consumablesEur)}</span></div>` : ""}
         ${p.urgentAdd ? `<div class="line" style="color:var(--warn)"><span>⚡ Urgență (+${p.urgentSurchargePct}%)</span><span>+${money(p.urgentAdd)}</span></div>` : ""}
         ${p.refundableAdd ? `<div class="line" style="color:var(--brand)"><span>🔓 Opțiune rambursabilă (+${p.refundableSurchargePct}%)</span><span>+${money(p.refundableAdd)}</span></div>` : ""}
+        ${p.launchDiscount ? `<div class="line" style="color:#0a7d3f"><span>🎉 Ofertă de lansare (−${p.launchDiscountPct}%)</span><span>−${money(p.launchDiscount)}</span></div>` : ""}
         <div class="line total"><span>Total de plată</span><span class="amt">${moneyBoth(p.total)}</span></div>`;
     };
 
@@ -4861,6 +4905,9 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         ${b.surPct ? `<div class="line" style="color:var(--warn)"><span>Weekend / sărbătoare (+${b.surPct}%)</span><span>+${money(b.surcharge)}</span></div>` : ""}
         ${b.linenIncluded && b.linenSets > 0 ? `<div class="line"><span>Lenjerie (${b.linenSets} × ${C.linenSetPriceRon} lei)</span><span>${b.linenRon} lei ≈ ${money(b.linenEur)}</span></div>` : ""}
         ${b.consumablesRon > 0 ? `<div class="line"><span>Consumabile (cu ${b.markupPct}% adaos)</span><span>${b.consumablesRon} lei ≈ ${money(b.consumablesEur)}</span></div>` : ""}
+        ${b.urgentAdd ? `<div class="line" style="color:var(--warn)"><span>⚡ Urgență (+${b.urgentSurchargePct}%)</span><span>+${money(b.urgentAdd)}</span></div>` : ""}
+        ${b.refundableAdd ? `<div class="line" style="color:var(--brand)"><span>🔓 Rambursabil (+${b.refundableSurchargePct}%)</span><span>+${money(b.refundableAdd)}</span></div>` : ""}
+        ${b.launchDiscount ? `<div class="line" style="color:#0a7d3f"><span>🎉 Ofertă de lansare (−${b.launchDiscountPct}%)</span><span>−${money(b.launchDiscount)}</span></div>` : ""}
         <div class="line"><span>Interval ${esc(r.date)} · ${esc(r.startTime)}–${esc(r.endTime)}</span><span></span></div>
         <div class="line total"><span>Total de plată</span><span class="amt">${moneyBoth(b.total)}</span></div>
       </div>
