@@ -555,14 +555,17 @@ const app = express();
 // marchează o solicitare ca plătită (idempotent) — folosit de webhook și de /verify
 const VIP = { baseRon: 100, extraRon: 50, discountPct: 10, periodDays: 30 };
 function vipMonthlyRon(locations) { return VIP.baseRon + VIP.extraRon * (Math.max(1, Number(locations) || 1) - 1); }
-async function activateVipServer(userId, locations, sessionId) {
+async function activateVipServer(userId, locationIdsCsv, sessionId) {
   const st = await getState();
   const u = (st.users || []).find(x => x.id === userId);
   if (!u) return false;
-  const loc = Math.max(1, Number(locations) || 1);
+  let ids = String(locationIdsCsv || "").split(",").map(s => s.trim()).filter(Boolean);
+  if (!ids.length) ids = (st.locations || []).filter(l => l.ownerId === userId && l.status === "approved").map(l => l.id);
+  ids = [...new Set(ids)];
+  const loc = Math.max(1, ids.length);
   const now = Date.now();
   const prevUntil = (u.vip && u.vip.until && u.vip.until > now) ? u.vip.until : now;
-  u.vip = { active: true, since: (u.vip && u.vip.since) || now, until: prevUntil + VIP.periodDays * 86400000, locations: loc, monthlyRon: vipMonthlyRon(loc), lastPaymentAt: now };
+  u.vip = { active: true, since: (u.vip && u.vip.since) || now, until: prevUntil + VIP.periodDays * 86400000, locationIds: ids, locations: loc, monthlyRon: vipMonthlyRon(loc), lastPaymentAt: now };
   if (sessionId) u.vip.stripeSessionId = sessionId;
   await saveState(st);
   console.log("[stripe] VIP activat:", userId, "·", loc, "locații");
@@ -599,7 +602,7 @@ app.post("/api/pay/webhook", express.raw({ type: "application/json" }), async (r
     if (event.type === "checkout.session.completed") {
       const s = event.data.object;
       if (s.payment_status === "paid" && s.metadata && s.metadata.vip) {
-        await activateVipServer(s.metadata.vip, s.metadata.locations, s.id);
+        await activateVipServer(s.metadata.vip, s.metadata.locationIds, s.id);
       } else if (s.payment_status === "paid" && s.metadata && s.metadata.reqId) {
         await markRequestPaid(s.metadata.reqId, s.id);
       }
@@ -795,10 +798,12 @@ app.post("/api/pay/vip/checkout", async (req, res) => {
     const st = await getState();
     const me = (st.users || []).find(u => u.id === uid);
     if (!me) return res.status(404).json({ ok: false, error: "Cont inexistent." });
-    const approvedLoc = (st.locations || []).filter(l => l.ownerId === uid && l.status === "approved").length;
-    const locations = Math.max(1, Number(req.body && req.body.locations) || approvedLoc || 1);
+    const approved = (st.locations || []).filter(l => l.ownerId === uid && l.status === "approved").map(l => l.id);
+    let ids = Array.isArray(req.body && req.body.locationIds) ? req.body.locationIds.filter(x => approved.includes(x)) : [];
+    if (!ids.length) ids = approved;
+    ids = [...new Set(ids)];
+    const locations = Math.max(1, ids.length);
     const monthlyRon = vipMonthlyRon(locations);
-    const ronPerEur = ((st.settings || {}).ronPerEur > 0) ? st.settings.ronPerEur : PRICE.ronPerEur;
     const baniRon = Math.round(monthlyRon * 100);   // lei → bani
     const proto = (req.headers["x-forwarded-proto"] || "https").split(",")[0];
     const origin = req.headers.origin || (proto + "://" + req.headers.host);
@@ -813,7 +818,7 @@ app.post("/api/pay/vip/checkout", async (req, res) => {
         },
         quantity: 1,
       }],
-      metadata: { vip: uid, locations: String(locations) },
+      metadata: { vip: uid, locations: String(locations), locationIds: ids.join(",") },
       success_url: origin + "/?vip=1&session_id={CHECKOUT_SESSION_ID}",
       cancel_url: origin + "/?vipcancel=1",
     });
@@ -829,7 +834,7 @@ app.get("/api/pay/verify", async (req, res) => {
     if (!sid) return res.status(400).json({ ok: false, error: "Lipsă session_id." });
     const s = await stripe.checkout.sessions.retrieve(String(sid));
     if (s && s.payment_status === "paid" && s.metadata && s.metadata.vip) {
-      await activateVipServer(s.metadata.vip, s.metadata.locations, s.id);
+      await activateVipServer(s.metadata.vip, s.metadata.locationIds, s.id);
       return res.json({ ok: true, paid: true, vip: true });
     }
     if (s && s.payment_status === "paid" && s.metadata && s.metadata.reqId) {

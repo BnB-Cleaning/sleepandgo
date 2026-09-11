@@ -485,6 +485,15 @@ a.pill.contact:hover { background: var(--brand); color: #fff; }
 .vip-card .vip-perk { color: #f4d58b; font-weight: 700; margin-top: 4px; }
 .vip-card .vip-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 16px; font-size: 12.5px; color: #cbb890; }
 
+/* ===== VIP — selector locații (cont) ===== */
+.vip-loc-list { display: flex; flex-direction: column; gap: 8px; }
+.vip-loc { display: flex; align-items: flex-start; gap: 10px; border: 1px solid var(--line, #2c3e4f); border-radius: 10px; padding: 11px 13px; cursor: pointer; background: var(--card-2, #22323f); }
+.vip-loc input { margin-top: 3px; width: 17px; height: 17px; flex: 0 0 auto; }
+.vip-loc span { display: flex; flex-direction: column; }
+.vip-loc small { color: var(--muted, #93a6b5); font-size: 12px; margin-top: 2px; }
+.vip-price-row { margin-top: 12px; font-size: 15px; }
+.vip-price-row strong { color: #f4d58b; }
+
 /* =========================================================
    Sleep & Go Cleaning — HOME / LANDING
    Brand preluat de pe sleepandgocleaning.com:
@@ -1915,34 +1924,52 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       R.paid[userId] = round2((Number(R.paid[userId]) || 0) + Math.max(0, avail)); save(db); return { ok: true };
     },
 
-    // ---- VIP Member (abonament) ----
+    // ---- VIP Member (abonament, per locație) ----
     vipConfig() { return CONFIG.vip; },
     vipMonthlyRon(locations) { const c = CONFIG.vip; return c.baseRon + c.extraRon * (Math.max(1, Number(locations) || 1) - 1); },
     vipLocationsFor(u) { return Math.max(1, this.approvedLocationsOfOwner(u.id).length); },
     isVipActive(u) { return !!(u && u.vip && u.vip.active && (!u.vip.until || u.vip.until > Date.now())); },
+    vipLocationIds(u) { return (u && u.vip && Array.isArray(u.vip.locationIds)) ? u.vip.locationIds.slice() : []; },
+    // discountul VIP se aplică DOAR pentru locațiile înscrise în abonament
+    isVipLocation(u, locId) { return this.isVipActive(u) && this.vipLocationIds(u).includes(locId); },
     vipInfo(u) {
       const c = CONFIG.vip;
       const v = (u && u.vip) || null;
       const active = this.isVipActive(u);
-      const locations = v ? v.locations : this.vipLocationsFor(u);
-      const monthlyRon = v ? v.monthlyRon : this.vipMonthlyRon(locations);
+      const locationIds = this.vipLocationIds(u);
+      const locations = (v && Array.isArray(v.locationIds)) ? v.locationIds.length : this.vipLocationsFor(u);
+      const monthlyRon = this.vipMonthlyRon(Math.max(1, locations));
       const daysLeft = (v && v.until) ? Math.max(0, Math.ceil((v.until - Date.now()) / 86400000)) : 0;
-      return { active, since: v ? v.since : null, until: v ? v.until : null, locations, monthlyRon, monthlyEur: round2(this.ronToEur(monthlyRon)), daysLeft, discountPct: c.discountPct };
+      return { active, since: v ? v.since : null, until: v ? v.until : null, locations, locationIds, monthlyRon, monthlyEur: round2(this.ronToEur(monthlyRon)), daysLeft, discountPct: c.discountPct };
     },
     // activează abonamentul (după plata simulată / mod local; pe server real se face din verify Stripe)
-    activateVip(locations) {
+    activateVip(locationIds) {
       const u = this.currentUser(); if (!u) return { ok: false, error: "Neautentificat." };
       const c = CONFIG.vip;
-      const loc = Math.max(1, Number(locations) || this.vipLocationsFor(u));
+      let ids = Array.isArray(locationIds) ? locationIds.filter(Boolean) : [];
+      // dacă nu s-au trimis locații, înscrie toate locațiile aprobate (min. implicit)
+      if (!ids.length) ids = this.approvedLocationsOfOwner(u.id).map(l => l.id);
+      ids = [...new Set(ids)];
       const now = Date.now();
       const prevUntil = (u.vip && u.vip.until && u.vip.until > now) ? u.vip.until : now;
-      u.vip = { active: true, since: (u.vip && u.vip.since) || now, until: prevUntil + c.periodDays * 86400000, locations: loc, monthlyRon: this.vipMonthlyRon(loc), lastPaymentAt: now };
+      u.vip = { active: true, since: (u.vip && u.vip.since) || now, until: prevUntil + c.periodDays * 86400000, locationIds: ids, locations: ids.length, monthlyRon: this.vipMonthlyRon(Math.max(1, ids.length)), lastPaymentAt: now };
       this.updateUser(u.id, { vip: u.vip });
       return { ok: true, vip: u.vip };
     },
-    async payVipCheckout(locations) {
+    // adaugă/scoate locații din abonamentul VIP activ
+    async setVipLocations(ids) {
+      const u = this.currentUser(); if (!u) return { ok: false, error: "Neautentificat." };
+      if (!this.isVipActive(u)) return { ok: false, error: "Abonamentul VIP nu este activ." };
+      const clean = [...new Set((Array.isArray(ids) ? ids : []).filter(Boolean))];
+      if (!clean.length) return { ok: false, error: "Selectează cel puțin o locație." };
+      u.vip = { ...u.vip, locationIds: clean, locations: clean.length, monthlyRon: this.vipMonthlyRon(Math.max(1, clean.length)) };
+      this.updateUser(u.id, { vip: u.vip });
+      if (MODE === "api") { try { await this.flush(); } catch (e) {} }
+      return { ok: true, vip: u.vip };
+    },
+    async payVipCheckout(locationIds) {
       if (MODE !== "api") return { ok: false, error: "demo" };
-      try { return await apiPOST("/api/pay/vip/checkout", { locations }); }
+      try { return await apiPOST("/api/pay/vip/checkout", { locationIds }); }
       catch (e) { return { ok: false, error: String(e.message || e) }; }
     },
     vipMembers() { return (db.users || []).filter(u => u.vip && u.vip.active).map(u => ({ id: u.id, name: u.name, email: u.email, ...this.vipInfo(u) })); },
@@ -2163,10 +2190,10 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       if (!loc || loc.status !== "approved") return { ok: false, error: "Alege o locație aprobată." };
       const slot = validateSlot(data.startTime, data.endTime);
       if (!slot.ok) return { ok: false, error: slot.error };
-      // discount: VIP (10% la fiecare solicitare) SAU ofertă de lansare (primele N) — nu se cumulează
+      // discount: VIP (10% doar pt. locațiile înscrise în abonament) SAU ofertă de lansare — nu se cumulează
       const requester = this.currentUser();
       let vipDiscountPct = 0, launchDiscountPct = 0;
-      if (this.isVipActive(requester)) {
+      if (this.isVipLocation(requester, loc.id)) {
         vipDiscountPct = (CONFIG.vip || {}).discountPct || 0;
       } else {
         const lo = CONFIG.launchOffer || {};
@@ -3768,34 +3795,69 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
   }
   function renderVipTab(u, body) {
     const info = S.vipInfo(u);
+    const c = S.vipConfig();
     const until = info.until ? new Date(info.until).toLocaleDateString("ro-RO") : "—";
-    const locLabel = info.locations === 1 ? "1 locație" : info.locations + " locații";
+    const locs = S.approvedLocationsOfOwner(u.id);
+    const enrolled = new Set(info.locationIds);
+    // checklist locații (implicit: cele înscrise dacă e activ, altfel toate bifate la abonare)
+    const checklist = locs.length ? `
+      <div class="vip-loc-list">
+        ${locs.map(l => `<label class="vip-loc"><input type="checkbox" class="vipLoc" value="${esc(l.id)}" ${(info.active ? enrolled.has(l.id) : true) ? "checked" : ""}/> <span><strong>${esc(l.address || l.name || "Locație")}</strong><small>${esc(l.area || "")}${l.sqm ? " · " + l.sqm + " m²" : ""}</small></span></label>`).join("")}
+      </div>` : `<p class="hint" style="color:var(--muted,#8aa)">Nu ai locații aprobate. Adaugă o locație din „Locațiile mele" și așteaptă aprobarea, apoi revii aici.</p>`;
+
     body.innerHTML = `
       ${vipCardHtml(u)}
       <div class="card" style="margin-top:16px">
         ${info.active
           ? `<strong style="font-size:17px">Ești VIP Member 👑</strong>
-             <p class="hint" style="margin:6px 0 0;color:var(--muted,#8aa)">Primești automat <strong>−${info.discountPct}%</strong> la fiecare solicitare. Abonament: <strong>${locLabel}</strong> · <strong>${info.monthlyRon} lei/lună</strong>. Valabil încă <strong>${info.daysLeft}</strong> zile (până la ${until}).</p>
-             <button class="btn" id="vipRenew" style="margin-top:12px">🔄 Prelungește o lună (${info.monthlyRon} lei)</button>`
+             <p class="hint" style="margin:6px 0 0;color:var(--muted,#8aa)">Primești automat <strong>−${info.discountPct}%</strong> la solicitările pentru locațiile înscrise. Abonament valabil încă <strong>${info.daysLeft}</strong> zile (până la ${until}).</p>
+             <h4 style="margin:16px 0 8px">Locațiile tale în VIP</h4>
+             <p class="hint" style="margin:0 0 10px;color:var(--muted,#8aa)">Bifează locațiile cu care vrei să participi. ${c.baseRon} lei prima + ${c.extraRon} lei/locație suplimentară.</p>
+             ${checklist}
+             <div class="vip-price-row"><span>Abonament lunar: <strong id="vipPrice">${info.monthlyRon} lei</strong></span></div>
+             ${locs.length ? `<button class="btn btn-block" id="vipSaveLocs" style="margin-top:12px">💾 Salvează locațiile</button>` : ""}
+             <button class="btn btn-soft btn-block" id="vipRenew" style="margin-top:8px">🔄 Prelungește o lună</button>`
           : `<strong style="font-size:17px">Devino VIP Member</strong>
              <ul style="margin:10px 0 0;padding-left:18px;line-height:1.9;color:var(--muted,#8aa)">
-               <li><strong style="color:inherit">−${info.discountPct}% la FIECARE solicitare</strong> (curățenie)</li>
+               <li><strong style="color:inherit">−${info.discountPct}%</strong> la fiecare solicitare pentru locațiile înscrise</li>
                <li>Card VIP premium în contul tău</li>
-               <li>Prioritate și beneficii pentru membri</li>
              </ul>
-             <p style="margin:12px 0 0">Abonament: <strong>${info.monthlyRon} lei/lună</strong> pentru ${locLabel} — <span class="hint" style="color:var(--muted,#8aa)">100 lei prima locație + 50 lei/locație suplimentară, încasat în avans.</span></p>
-             <button class="btn btn-block" id="vipJoin" style="margin-top:14px">👑 Activează VIP — ${info.monthlyRon} lei/lună</button>`}
+             <h4 style="margin:16px 0 8px">Alege locațiile cu care participi</h4>
+             <p class="hint" style="margin:0 0 10px;color:var(--muted,#8aa)">${c.baseRon} lei/lună prima locație + ${c.extraRon} lei/lună pentru fiecare locație suplimentară, încasat în avans.</p>
+             ${checklist}
+             <div class="vip-price-row"><span>De plată acum: <strong id="vipPrice">${info.monthlyRon} lei</strong>/lună</span></div>
+             ${locs.length ? `<button class="btn btn-block" id="vipJoin" style="margin-top:12px">👑 Activează VIP — <span id="vipJoinPrice">${info.monthlyRon}</span> lei/lună</button>` : ""}`}
       </div>`;
-    const join = body.querySelector("#vipJoin"); if (join) join.onclick = () => openVipPayment(u);
-    const renew = body.querySelector("#vipRenew"); if (renew) renew.onclick = () => openVipPayment(u);
+
+    const selectedIds = () => [...body.querySelectorAll(".vipLoc:checked")].map(x => x.value);
+    const recalc = () => {
+      const n = Math.max(1, selectedIds().length);
+      const ron = S.vipMonthlyRon(n);
+      const pe = body.querySelector("#vipPrice"); if (pe) pe.textContent = ron + " lei";
+      const jp = body.querySelector("#vipJoinPrice"); if (jp) jp.textContent = ron;
+    };
+    body.querySelectorAll(".vipLoc").forEach(cb => cb.onchange = recalc);
+    recalc();
+    const join = body.querySelector("#vipJoin"); if (join) join.onclick = () => {
+      const ids = selectedIds(); if (!ids.length) return toast("Alege cel puțin o locație.", "err");
+      openVipPayment(u, ids);
+    };
+    const renew = body.querySelector("#vipRenew"); if (renew) renew.onclick = () => openVipPayment(u, info.locationIds.length ? info.locationIds : selectedIds());
+    const save = body.querySelector("#vipSaveLocs"); if (save) save.onclick = async () => {
+      const ids = selectedIds(); if (!ids.length) return toast("Alege cel puțin o locație.", "err");
+      const res = await S.setVipLocations(ids);
+      if (res && res.ok) { toast("Locații VIP actualizate.", "ok"); renderSolicitant(u); } else toast((res && res.error) || "Eroare.", "err");
+    };
   }
-  async function openVipPayment(u) {
+  async function openVipPayment(u, locationIds) {
+    const ids = (Array.isArray(locationIds) && locationIds.length) ? locationIds : S.vipInfo(u).locationIds;
+    const locations = Math.max(1, ids.length || S.vipInfo(u).locations);
+    const monthlyRon = S.vipMonthlyRon(locations), monthlyEur = S.ronToEur(monthlyRon);
     const info = S.vipInfo(u);
-    const locations = info.locations, monthlyRon = info.monthlyRon, monthlyEur = info.monthlyEur;
     // 1) Stripe real (dacă serverul are chei)
     if (S.mode && S.mode() === "api") {
       toast("Se pregătește plata securizată…", "");
-      const res = await S.payVipCheckout(locations);
+      const res = await S.payVipCheckout(ids);
       if (res && res.ok && res.url) { window.location.href = res.url; return; }
       if (res && res.error && !["stripe_unconfigured", "demo"].includes(res.error)) return toast(res.error, "err");
     }
@@ -3829,7 +3891,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         return toast("Completează datele cardului (test: 4242 4242 4242 4242).", "err");
       const btn = $("#vipPayBtn"); btn.disabled = true; btn.textContent = "Se procesează…";
       setTimeout(async () => {
-        const res = S.activateVip(locations);
+        const res = S.activateVip(ids);
         if (MODE_flush()) { try { await S.flush(); } catch (e) {} }
         closeModal();
         if (res && res.ok) { toast("Bine ai venit în clubul VIP! 👑 Ai −" + info.discountPct + "% la fiecare solicitare.", "ok"); solTab = "vip"; renderSolicitant(u); }
