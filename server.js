@@ -434,7 +434,8 @@ function ensureReferrals(st) {
   const r = st.referrals;
   if (!r.clicks || typeof r.clicks !== "object") r.clicks = {};
   if (!Array.isArray(r.ledger)) r.ledger = [];
-  if (!r.paid || typeof r.paid !== "object") r.paid = {};
+  if (!r.paid || typeof r.paid !== "object") r.paid = {};     // plăți cash făcute de admin
+  if (!r.spent || typeof r.spent !== "object") r.spent = {};  // credit folosit de solicitant la plata serviciilor
   return r;
 }
 function genRefCode(st) {
@@ -448,6 +449,11 @@ function ensureRefCodes(st) {
 }
 function refEarned(st, userId) {
   return round2((st.referrals.ledger || []).filter(e => e.referrerId === userId).reduce((s, e) => s + (Number(e.amountEur) || 0), 0));
+}
+// sold disponibil = câștigat − plătit cash (admin) − cheltuit pe servicii
+function refAvailable(st, userId) {
+  const r = ensureReferrals(st);
+  return round2(refEarned(st, userId) - (Number(r.paid[userId]) || 0) - (Number(r.spent[userId]) || 0));
 }
 // Creditează recomandările pentru solicitările nou-finalizate (tranziție reală)
 function creditReferrals(prev, next) {
@@ -734,6 +740,10 @@ app.post("/api/pay/checkout", async (req, res) => {
     if (r.requesterId !== uid) return res.status(403).json({ ok: false, error: "Nu este solicitarea ta." });
     if (r.status !== "nou") return res.json({ ok: false, error: "already_paid" });
     const price = priceOfServer(r, st);
+    // scade creditul din recomandări deja aplicat pe această solicitare
+    const ronPerEur2 = ((st.settings || {}).ronPerEur > 0) ? st.settings.ronPerEur : PRICE.ronPerEur;
+    const creditBani = Math.round((Number(r.refCreditUsed) || 0) * ronPerEur2 * 100);
+    price.baniRon = Math.max(0, price.baniRon - creditBani);
     if (!price.baniRon || price.baniRon < 200) return res.status(400).json({ ok: false, error: "Sumă invalidă." });
     const proto = (req.headers["x-forwarded-proto"] || "https").split(",")[0];
     const origin = req.headers.origin || (proto + "://" + req.headers.host);
@@ -968,10 +978,36 @@ app.post("/api/ref/payout", async (req, res) => {
     if (!me || me.role !== "admin") return res.status(403).json({ ok: false, error: "Doar administratorul." });
     const userId = req.body && req.body.userId;
     const r = ensureReferrals(st);
-    const earned = refEarned(st, userId);
-    r.paid[userId] = earned;   // marchează tot ca plătit
+    const avail = refAvailable(st, userId);          // doar soldul rămas (după credit cheltuit)
+    r.paid[userId] = round2((Number(r.paid[userId]) || 0) + Math.max(0, avail));
     await saveState(st);
-    res.json({ ok: true, paid: earned });
+    res.json({ ok: true, paid: Math.max(0, avail) });
+  } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
+});
+// Solicitantul folosește creditul din recomandări pentru a plăti (parțial/integral) o solicitare
+app.post("/api/ref/redeem", async (req, res) => {
+  try {
+    const uidReq = readSession(req);
+    if (!uidReq) return res.status(401).json({ ok: false, error: "Neautentificat." });
+    const reqId = req.body && req.body.reqId;
+    const st = await getState();
+    const r = (st.requests || []).find(x => x.id === reqId);
+    if (!r) return res.status(404).json({ ok: false, error: "Solicitare inexistentă." });
+    if (r.requesterId !== uidReq) return res.status(403).json({ ok: false, error: "Nu este solicitarea ta." });
+    if (r.status !== "nou") return res.json({ ok: false, error: "Solicitarea nu mai poate fi plătită." });
+    const ref = ensureReferrals(st);
+    const available = refAvailable(st, uidReq);
+    if (available <= 0) return res.json({ ok: false, error: "Nu ai credit din recomandări disponibil." });
+    const total = round2(priceOfServer(r, st).totalEur - (Number(r.refCreditUsed) || 0));
+    const creditUsed = round2(Math.min(available, total));
+    if (creditUsed <= 0) return res.json({ ok: false, error: "Nimic de acoperit din credit." });
+    ref.spent[uidReq] = round2((Number(ref.spent[uidReq]) || 0) + creditUsed);
+    r.refCreditUsed = round2((Number(r.refCreditUsed) || 0) + creditUsed);
+    const remaining = round2(total - creditUsed);
+    let fullyPaid = false;
+    if (remaining <= 0.009) { r.status = "platit"; r.paidAt = Date.now(); fullyPaid = true; }
+    await saveState(st);
+    res.json({ ok: true, creditUsed, fullyPaid, remainingEur: Math.max(0, remaining), available: refAvailable(st, uidReq) });
   } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 

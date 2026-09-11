@@ -1767,6 +1767,7 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       if (!r.clicks || typeof r.clicks !== "object") r.clicks = {};
       if (!Array.isArray(r.ledger)) r.ledger = [];
       if (!r.paid || typeof r.paid !== "object") r.paid = {};
+      if (!r.spent || typeof r.spent !== "object") r.spent = {};
       return r;
     },
     _genRefCode() {
@@ -1792,13 +1793,40 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       const mine = R.ledger.filter(e => e.referrerId === u.id);
       const earned = round2(mine.reduce((s, e) => s + (Number(e.amountEur) || 0), 0));
       const paid = round2(R.paid[u.id] || 0);
-      const pending = round2(earned - paid);
+      const spent = round2(R.spent[u.id] || 0);
+      const available = round2(earned - paid - spent);   // sold de folosit (cash la 50€ sau credit servicii)
       return {
         code: this.myRefCode(u), link: this.refLink(u),
         clicks: R.clicks[this.myRefCode(u)] || 0,
-        earned, paid, pending, credits: mine.length,
-        eligible: pending >= this.REF_PAYOUT_EUR, threshold: this.REF_PAYOUT_EUR,
+        earned, paid, spent, available, pending: available, credits: mine.length,
+        eligible: available >= this.REF_PAYOUT_EUR, threshold: this.REF_PAYOUT_EUR,
       };
+    },
+    refAvailable(u) { return u ? this.refStats(u).available : 0; },
+    // solicitantul folosește creditul din recomandări pt. o solicitare (parțial/integral)
+    async redeemReferral(reqId) {
+      if (MODE === "api") {
+        let r; try { r = await apiPOST("/api/ref/redeem", { reqId }); } catch (e) { return { ok: false, error: "Eroare de rețea." }; }
+        if (r && r.ok) { try { await refreshState(); } catch (e) {} }
+        return r || { ok: false, error: "A eșuat." };
+      }
+      const req = this.requestById(reqId);
+      if (!req) return { ok: false, error: "Solicitare inexistentă." };
+      if (req.status !== STATUS.NOU) return { ok: false, error: "Solicitarea nu mai poate fi plătită." };
+      const u = this.currentUser(); if (!u) return { ok: false, error: "Neautentificat." };
+      const R = this._ensureReferrals();
+      const available = this.refAvailable(u);
+      if (available <= 0) return { ok: false, error: "Nu ai credit din recomandări disponibil." };
+      const total = round2(priceOf(req).total - (Number(req.refCreditUsed) || 0));
+      const creditUsed = round2(Math.min(available, total));
+      if (creditUsed <= 0) return { ok: false, error: "Nimic de acoperit din credit." };
+      R.spent[u.id] = round2((Number(R.spent[u.id]) || 0) + creditUsed);
+      req.refCreditUsed = round2((Number(req.refCreditUsed) || 0) + creditUsed);
+      const remaining = round2(total - creditUsed);
+      let fullyPaid = false;
+      if (remaining <= 0.009) { req.status = STATUS.PLATIT; req.paidAt = Date.now(); fullyPaid = true; }
+      save(db);
+      return { ok: true, creditUsed, fullyPaid, remainingEur: Math.max(0, remaining), available: this.refAvailable(u) };
     },
     async recordRefClick(code) {
       code = String(code || "").toUpperCase(); if (!code) return;
@@ -3572,9 +3600,12 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
           <div class="rs hi"><span class="rs-n">${money(st.pending)}</span><span class="rs-l">de încasat</span></div>
         </div>
         <div class="ref-prog" title="${money(st.pending)} din ${st.threshold} €"><div class="ref-prog-bar" style="width:${pct}%"></div></div>
-        <p class="hint ref-note" style="color:var(--muted,#8aa)">${st.eligible
-          ? `✅ Ai atins pragul de ${st.threshold} € — plata se procesează de administrator.`
-          : `Încă <strong>${money(Math.max(0, st.threshold - st.pending))}</strong> până la pragul de plată de ${st.threshold} €.`}</p>
+        ${u.role === "solicitant"
+          ? `<p class="hint ref-note" style="color:#0a7d3f;font-weight:600">💡 Poți folosi acest sold pentru a-ți plăti serviciile — se oferă automat la plata unei solicitări.${st.spent > 0 ? ` (Ai folosit deja ${money(st.spent)}.)` : ""}</p>
+             <p class="hint" style="color:var(--muted,#8aa);margin-top:4px">Sau îl încasezi cash când ajunge la ${st.threshold} € (${st.eligible ? "atins ✅" : "încă " + money(Math.max(0, st.threshold - st.pending))}).</p>`
+          : `<p class="hint ref-note" style="color:var(--muted,#8aa)">${st.eligible
+              ? `✅ Ai atins pragul de ${st.threshold} € — plata se procesează de administrator.`
+              : `Încă <strong>${money(Math.max(0, st.threshold - st.pending))}</strong> până la pragul de plată de ${st.threshold} €.`}</p>`}
       </div>`;
   }
   function wireReferral(root) {
@@ -4875,7 +4906,47 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     return card;
   }
 
-  async function openPayment(reqId, u) {
+  // Ofertă: folosește creditul din recomandări pentru această plată (înainte de card)
+  function offerReferralCredit(reqId, u, avail) {
+    const r = S.requestById(reqId);
+    const total = S.breakdown(r).total;
+    const apply = Math.min(avail, total);
+    const coversAll = apply >= total - 0.009;
+    modal(`
+      <h3 style="margin:0 0 8px">🎁 Ai credit din recomandări</h3>
+      <p style="margin:0 0 14px;color:var(--muted,#8aa)">Ai <strong>${money(avail)}</strong> disponibili din recomandări. Vrei să-i folosești pentru această plată de <strong>${money(total)}</strong>?</p>
+      <div class="summary" style="margin-bottom:16px">
+        <div class="line"><span>Total solicitare</span><span>${money(total)}</span></div>
+        <div class="line" style="color:#0a7d3f"><span>🎁 Credit recomandări</span><span>−${money(apply)}</span></div>
+        <div class="line total"><span>${coversAll ? "Acoperit integral" : "Rămâne de plătit cu cardul"}</span><span class="amt">${money(Math.max(0, total - apply))}</span></div>
+      </div>
+      <button class="btn btn-block" id="useCredit">🎁 Folosește creditul${coversAll ? " (plată integrală)" : ""}</button>
+      <button class="btn btn-ghost btn-block" style="margin-top:8px" id="payCardOnly">Plătesc integral cu cardul</button>
+    `);
+    $("#payCardOnly").onclick = () => { closeModal(); openPayment(reqId, u, true); };
+    $("#useCredit").onclick = async () => {
+      const btn = $("#useCredit"); btn.disabled = true; btn.textContent = "Se aplică…";
+      const res = await S.redeemReferral(reqId);
+      if (!res || !res.ok) { btn.disabled = false; btn.textContent = "🎁 Folosește creditul"; return toast((res && res.error) || "Nu s-a putut folosi creditul.", "err"); }
+      if (res.fullyPaid) {
+        closeModal();
+        toast("Plătit integral din creditul de recomandări! 🎉", "ok");
+        solTab = "mine"; renderSolicitant(u);
+      } else {
+        closeModal();
+        toast(`S-au folosit ${money(res.creditUsed)} din credit. Mai ai de plătit ${money(res.remainingEur)}.`, "ok");
+        openPayment(reqId, u, true);
+      }
+    };
+  }
+
+  async function openPayment(reqId, u, skipCredit) {
+    // 0) Dacă solicitantul are credit din recomandări, oferă-l întâi
+    if (!skipCredit) {
+      const rr = S.requestById(reqId);
+      const avail = S.refAvailable(u);
+      if (avail > 0 && rr && rr.status === S.STATUS.NOU) return offerReferralCredit(reqId, u, avail);
+    }
     // 1) Încearcă plata REALĂ prin Stripe Checkout (dacă serverul are chei configurate)
     if (S.mode && S.mode() === "api") {
       toast("Se pregătește plata securizată…", "");
@@ -4890,6 +4961,8 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     // 2) Fallback: simulare (mod demo sau server fără chei Stripe)
     const r = S.requestById(reqId);
     const b = S.breakdown(r);
+    const credit = Number(r.refCreditUsed) || 0;
+    const due = Math.round((b.total - credit) * 100) / 100;   // de plătit cu cardul, după credit
     modal(`
       <div class="stripe-head">
         <span class="stripe-logo">stripe</span>
@@ -4897,7 +4970,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
       </div>
       <div class="stripe-amount">
         <span class="stripe-amt-label">Sleep &amp; Go Cleaning</span>
-        <span class="stripe-amt-value">${moneyBoth(b.total)}</span>
+        <span class="stripe-amt-value">${moneyBoth(due)}</span>
       </div>
       <div class="summary" style="margin-bottom:16px">
         <div class="line"><span>Curățenie (${r.sqm} m²)</span><span>${money(b.cleaning)}</span></div>
@@ -4908,8 +4981,9 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         ${b.urgentAdd ? `<div class="line" style="color:var(--warn)"><span>⚡ Urgență (+${b.urgentSurchargePct}%)</span><span>+${money(b.urgentAdd)}</span></div>` : ""}
         ${b.refundableAdd ? `<div class="line" style="color:var(--brand)"><span>🔓 Rambursabil (+${b.refundableSurchargePct}%)</span><span>+${money(b.refundableAdd)}</span></div>` : ""}
         ${b.launchDiscount ? `<div class="line" style="color:#0a7d3f"><span>🎉 Ofertă de lansare (−${b.launchDiscountPct}%)</span><span>−${money(b.launchDiscount)}</span></div>` : ""}
+        ${credit > 0 ? `<div class="line" style="color:#0a7d3f"><span>🎁 Credit recomandări</span><span>−${money(credit)}</span></div>` : ""}
         <div class="line"><span>Interval ${esc(r.date)} · ${esc(r.startTime)}–${esc(r.endTime)}</span><span></span></div>
-        <div class="line total"><span>Total de plată</span><span class="amt">${moneyBoth(b.total)}</span></div>
+        <div class="line total"><span>${credit > 0 ? "De plătit cu cardul" : "Total de plată"}</span><span class="amt">${moneyBoth(due)}</span></div>
       </div>
       <div class="field"><label>Email</label><input id="pc_email" type="email" value="${esc(u.email)}"/></div>
       <div class="field">
@@ -4924,7 +4998,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         <div class="hint">Card de test: <span class="link" id="fillTest">4242 4242 4242 4242</span> · orice dată viitoare · orice CVC</div>
       </div>
       <div class="field"><label>Nume pe card</label><input id="pc_name" placeholder="Nume Prenume" value="${esc(u.name)}"/></div>
-      <button class="btn btn-block stripe-pay" id="payBtn">Plătește ${moneyBoth(b.total)}</button>
+      <button class="btn btn-block stripe-pay" id="payBtn">Plătește ${moneyBoth(due)}</button>
       <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="_cancelUnpaid('${r.id}')">Anulează</button>
       <p class="stripe-foot">🔒 Plată securizată prin Stripe. Suma e reținută în avans. După preluare, curățenia (${money(b.cleaningPayout)})${b.linenIncluded && b.linenSets > 0 ? ` și serviciul de lenjerie (${money(b.linenPayout)})` : ""} se eliberează către Agenți Cleaning la finalizare (comision platformă ${b.pct}%).</p>
     `);
