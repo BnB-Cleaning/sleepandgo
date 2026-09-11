@@ -975,6 +975,7 @@ body.landing-active { background: var(--h-bg); }
     linenMinSets: 4,          // proprietarul trebuie să introducă minim 4 lenjerii în circuit
     reviewMinPerMonth: 5,     // recenzii doar pentru solicitanții cu ≥5 solicitări în luna respectivă
     guaranteeBonusRon: 50,    // garanție client: dacă nu se face curățenia în intervalul orar rezervat → bani înapoi + acest bonus (lei)
+    agentLatePenaltyRon: 50,  // penalizare Agent Cleaning către platformă dacă nu termină lucrarea la timp (lei)
     // O „lenjerie" (un set) este compusă din:
     linenComposition: ["1 plic", "1 cearșaf", "2 fețe de pernă", "2 prosoape", "1 prosop de baie"],
     // Forme de organizare acceptate pentru Agenți Cleaning (doar entități juridice)
@@ -1001,7 +1002,7 @@ body.landing-active { background: var(--h-bg); }
     urgentMinLeadHours: 5,           // se poate plasa cu minim 5 ore înainte de ora de începere
     // Ofertă de LANSARE: primele N curățenii primesc un discount, suportat din comisionul adminului
     // (plata Agentului Cleaning rămâne neschimbată — reducerea iese din comisionul platformei).
-    launchOffer: { active: true, discountPct: 10, maxActions: 10 },
+    launchOffer: { active: true, discountPct: 10, maxActions: 100 },
     // Abonament VIP Member: 10% discount la fiecare solicitare; 100 lei/lună prima locație,
     // +50 lei/lună pentru fiecare locație suplimentară; se încasează în avans (Stripe).
     vip: { baseRon: 100, extraRon: 50, discountPct: 10, periodDays: 30 },
@@ -3454,14 +3455,14 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
           <p class="hint" style="text-align:center;margin-top:20px;color:var(--h-muted)">⏰ Solicitările pentru o dată se trimit până la ora 21:00 cu o zi înainte · ⚡ urgență: cu minim ${C.urgentMinLeadHours}h înainte.</p>
         </div></section>
 
-        <!-- Întrebări frecvente -->
-        ${faqSection("Întrebări frecvente", "Ce vor să știe proprietarii", "Răspunsuri clare despre prețuri, plată, garanție și cum decurge o curățenie în regim hotelier.", homeFaq, { soft: true, image: (window.SHOTS || {}).client, imageAlt: "Interfața solicitantului — trimitere solicitare nouă", imageCaption: "Interfața solicitantului: alegi locația, data, intervalul și lenjeria, apoi plătești în avans." })}
-
         <!-- VIP Member -->
         ${vipPromo()}
 
         <!-- Recomandă și câștigă -->
         ${referralPromo()}
+
+        <!-- Întrebări frecvente -->
+        ${faqSection("Întrebări frecvente", "Ce vor să știe proprietarii", "Răspunsuri clare despre prețuri, plată, garanție și cum decurge o curățenie în regim hotelier.", homeFaq, { soft: true, image: (window.SHOTS || {}).client, imageAlt: "Interfața solicitantului — trimitere solicitare nouă", imageCaption: "Interfața solicitantului: alegi locația, data, intervalul și lenjeria, apoi plătești în avans." })}
 
         <!-- CTA band -->
         <section class="h-section"><div class="wrap">
@@ -3778,7 +3779,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
   // secțiune promo pe landing-uri (logat sau nu) — evidențiază programul
   function referralPromo() {
     return `
-      <section class="h-section soft" id="referral"><div class="wrap">
+      <section class="h-section" id="referral"><div class="wrap">
         <div class="ref-promo">
           <div class="ref-promo-badge">🎁</div>
           <div class="ref-promo-text">
@@ -3921,7 +3922,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
   function vipPromo() {
     const c = S.vipConfig();
     return `
-      <section class="h-section" id="vip"><div class="wrap">
+      <section class="h-section soft" id="vip"><div class="wrap">
         <div class="vip-promo">
           <div class="vip-promo-card">${vipPromoCardStatic()}</div>
           <div class="vip-promo-text">
@@ -4286,6 +4287,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
           <li><strong>Consumabile:</strong> își recuperează achiziția + <strong>${csp.executant}%</strong> din adaos, pentru produsele puse în locație.</li>
           <li><strong>Prime opțiuni</strong> (⚡ urgență / 🔓 rambursabil): primește <strong>${cleanPct}%</strong> din primă; Platforma ${pct}%.</li>
           <li>Încasează <strong>automat după finalizare</strong> (marchează „gata pentru oaspeți"). Plata e garantată în avans.</li>
+          <li><strong>Penalizare pentru întârziere:</strong> dacă Agentul Cleaning <strong>nu termină lucrarea în intervalul orar rezervat</strong>, datorează Platformei o penalizare de <strong>${C.agentLatePenaltyRon} lei</strong> per lucrare, care se poate reține din încasările sale.</li>
         </ul>
 
         <h3>5.3. Serviciul de lenjerie</h3>
@@ -4343,6 +4345,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         <ul>
           <li><strong>Pentru Solicitant:</strong> dacă lucrarea <strong>nu este efectuată în intervalul orar rezervat</strong>, primești <strong>rambursarea integrală</strong> pentru acea solicitare, plus <strong>${C.guaranteeBonusRon} lei</strong> compensație.</li>
           <li><strong>Pentru prestatori:</strong> la înscriere se poate solicita o <strong>garanție returnabilă</strong> care acoperă lenjeria și consumabilele aflate în grija lor; se restituie la încetarea colaborării, conform contractului generat în platformă.</li>
+          <li><strong>Penalizare de întârziere (Agent Cleaning):</strong> dacă lucrarea nu este finalizată în intervalul orar rezervat, Agentul Cleaning datorează Platformei <strong>${C.agentLatePenaltyRon} lei</strong> penalizare per lucrare (independent de garanția și compensația acordate Solicitantului).</li>
         </ul>
 
         <h2>13. Lenjerie</h2>
@@ -4600,6 +4603,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
                 <li>Te <strong>înscrii</strong> la solicitările plătite din zona ta; clientul te <strong>alege</strong> după rating și recenzii.</li>
                 <li>Încasezi <strong>automat după ce marchezi lucrarea finalizată</strong> („locația e gata pentru oaspeți").</li>
                 <li>Fără facturi neîncasate și fără căutare de clienți — tu decizi ce lucrări preiei.</li>
+                <li>⚠️ <strong>Termină la timp:</strong> dacă nu finalizezi în intervalul rezervat, datorezi platformei o penalizare de <strong>${C.agentLatePenaltyRon} lei</strong> per lucrare.</li>
               </ul>
             </div>
           </div>
