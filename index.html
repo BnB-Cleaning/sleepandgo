@@ -993,6 +993,21 @@ body.landing-active { background: var(--h-bg); }
 .inv-need-box h3 { font-family: 'Poppins', sans-serif; font-size: 17px; color: var(--h-ink); }
 .inv-need-box p { margin: 0; font-size: 15px; line-height: 1.65; color: #33414f; }
 
+/* Calculator de profitabilitate (investitori) */
+.calc { background: #fff; border: 1px solid var(--h-line); border-radius: 16px; padding: 22px 22px 20px; margin: 0 0 28px; box-shadow: 0 8px 30px rgba(16,42,73,.06); }
+.calc h2 { font-family: 'Poppins', sans-serif; font-size: 20px; color: var(--h-ink); }
+.calc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px 16px; margin: 4px 0 18px; }
+.calc-grid label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--h-ink); }
+.calc-grid input { font: inherit; padding: 10px 12px; border: 1px solid var(--h-line); border-radius: 10px; background: var(--h-soft); color: var(--h-ink); }
+.calc-grid input:focus { outline: none; border-color: var(--h-blue); box-shadow: 0 0 0 3px rgba(0,159,227,.15); background: #fff; }
+.calc-out { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+.calc-out .co { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; background: var(--h-soft); border: 1px solid var(--h-line); border-radius: 11px; padding: 12px 14px; }
+.calc-out .co-l { font-size: 13px; color: var(--h-muted); }
+.calc-out .co-v { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 18px; color: var(--h-ink); white-space: nowrap; }
+.calc-out .co.hi { background: linear-gradient(135deg, rgba(0,159,227,.10), rgba(61,102,174,.08)); border-color: rgba(0,159,227,.35); }
+.calc-out .co.hi .co-v { color: var(--h-blue); font-size: 20px; }
+@media (max-width: 640px) { .calc-grid, .calc-out { grid-template-columns: 1fr; } }
+
 </style>
 
   <header class="topbar" id="topbar" hidden>
@@ -1071,7 +1086,7 @@ body.landing-active { background: var(--h-bg); }
     // Randament investitori: 50% din comisionul de spălătorie + 50% din chiria lenjeriei.
     // startupEur = capital minim pentru demararea proiectului; marginPct = marjă de siguranță (buffer)
     // ca proiectul să nu se blocheze pentru sume mici; budgetEur = ținta de strâns = startup + marjă.
-    investment: { startupEur: 10000, marginPct: 30, budgetEur: 13000, laundryCommissionSharePct: 50, linenRentalSharePct: 50, minEur: 500 },
+    investment: { startupEur: 10000, marginPct: 30, budgetEur: 13000, laundryCommissionSharePct: 50, linenRentalSharePct: 50, minEur: 500, operationalSalaryEur: 1500 },
     // Sărbători legale România (fixe, format „LL-ZZ"). Paștele/Rusaliile sunt mobile (neincluse).
     legalHolidays: ["01-01", "01-02", "01-24", "05-01", "06-01", "08-15", "11-30", "12-01", "12-25", "12-26"],
     // limită de dimensiune pentru documentul de suprafață (demo, salvat în localStorage)
@@ -4709,6 +4724,32 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
           <p style="margin:0">Pentru demararea proiectului e nevoie de <strong>${c.startupEur.toLocaleString("ro-RO")} €</strong> (lenjerii, prosoape, cipuri de etichetare, sisteme de scanare, prima rută). Strângem însă <strong>${c.budgetEur.toLocaleString("ro-RO")} €</strong> — capitalul de demarare <strong>plus o marjă de siguranță de ${c.marginPct}%</strong> — ca proiectul să pornească solid și <strong>să nu se blocheze pentru sume mici</strong> sau cheltuieli neprevăzute. Banii nu se colectează în avans: fiecare investitor depune o <strong>garanție bancară</strong>, activată abia la atingerea țintei.</p>
         </div>
 
+        <div class="calc" id="investCalc">
+          <h2 style="margin-top:0">🧮 Calculator de profitabilitate</h2>
+          <p style="margin:0 0 4px">Estimează-ți randamentul — modifică ipotezele și totul se recalculează instant.</p>
+          <p class="hint" style="margin:0 0 16px;color:var(--h-muted)">Modelul include și un <strong>angajat operațional</strong> (min. <strong>${c.operationalSalaryEur.toLocaleString("ro-RO")} € net/lună</strong>) care lansează proiectul: contactează și găsește furnizorii de lenjerii, comandă cipurile și echipamentele de spălătorie, coordonează personalul de transport, alimentarea și restul operațiunilor.</p>
+          <div class="calc-grid">
+            <label>Investiția ta (€)<input type="number" id="ic_invest" value="3000" min="0" step="100"></label>
+            <label>Seturi de lenjerie<input type="number" id="ic_sets" value="200" min="0"></label>
+            <label>Rotații / set / lună<input type="number" id="ic_rot" value="8" min="0"></label>
+            <label>Chirie / rotație (lei)<input type="number" id="ic_rent" value="8" min="0"></label>
+            <label>Comision spălătorie / rotație (lei)<input type="number" id="ic_com" value="15" min="0"></label>
+            <label>Angajat operațional — net (€/lună)<input type="number" id="ic_salary" value="${c.operationalSalaryEur}" min="${c.operationalSalaryEur}" step="100"></label>
+            <label>Alte costuri operaționale (€/lună)<input type="number" id="ic_opex" value="800" min="0" step="50"></label>
+          </div>
+          <div class="calc-out">
+            <div class="co"><span class="co-l">Rotații / lună</span><span class="co-v" id="ico_turnovers">—</span></div>
+            <div class="co"><span class="co-l">Venit lunar (chirie + comision)</span><span class="co-v" id="ico_revenue">—</span></div>
+            <div class="co"><span class="co-l">Fond investitori (${c.linenRentalSharePct}%+${c.laundryCommissionSharePct}%)</span><span class="co-v" id="ico_pool">—</span></div>
+            <div class="co hi"><span class="co-l">Partea ta / lună</span><span class="co-v" id="ico_share">—</span></div>
+            <div class="co hi"><span class="co-l">Randamentul tău / an</span><span class="co-v" id="ico_annual">—</span></div>
+            <div class="co"><span class="co-l">Amortizarea investiției</span><span class="co-v" id="ico_payback">—</span></div>
+            <div class="co"><span class="co-l">Cost angajat (total angajator)</span><span class="co-v" id="ico_salaryTotal">—</span></div>
+            <div class="co"><span class="co-l">Profit net platformă / lună</span><span class="co-v" id="ico_platformNet">—</span></div>
+          </div>
+          <p class="hint" style="font-size:12.5px;color:var(--h-muted);margin-top:12px">Estimare orientativă. „Partea ta" = din fondul investitorilor, proporțional cu aportul tău din capitalul total de ${c.budgetEur.toLocaleString("ro-RO")} €. Costul total al angajatului include taxele (net × ~1,74). „Profit net platformă" arată dacă operațiunea își acoperă costurile (angajat + logistică) din partea reținută de platformă — dacă e roșu, cresc volumul sau ajustează prețurile.</p>
+        </div>
+
         <h2>1. Prima constatare: nu ai un portofoliu, ai trei afaceri diferite</h2>
         <p>Otopeni → sudul Bucureștiului sunt ~35 km pe axa nord-sud, cu 60–90 minute de mers în trafic la orele de curățenie. Pe axa asta ai trei tipuri de client, cu logistică incompatibilă:</p>
         <div class="tbl-wrap"><table>
@@ -4818,6 +4859,61 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         <div class="inv-land-cta"><button class="h-btn primary lg" data-reg="investitor">📈 Devino investitor · depune garanția</button></div>
       </div>`
     );
+    wireInvestCalc();
+  }
+
+  function wireInvestCalc() {
+    const box = $("#investCalc");
+    if (!box) return;
+    const c = S.investmentConfig();
+    const EUR = 5;                 // lei → € (curs orientativ)
+    const num = (id) => { const v = parseFloat(($("#" + id) || {}).value); return isFinite(v) ? v : 0; };
+    const recalc = () => {
+      const invest  = num("ic_invest");
+      const sets    = num("ic_sets");
+      const rot     = num("ic_rot");
+      const rentLei = num("ic_rent");
+      const comLei  = num("ic_com");
+      let salary    = num("ic_salary");
+      const salaryMin = c.operationalSalaryEur || 1500;
+      if (salary < salaryMin) salary = salaryMin; // minim net impus
+      const opex    = num("ic_opex");
+
+      const turnovers  = sets * rot;                       // rotații / lună
+      const rentRev    = turnovers * rentLei / EUR;        // venit chirie (€)
+      const comRev     = turnovers * comLei / EUR;         // venit comision spălătorie (€)
+      const revenue    = rentRev + comRev;                 // venit lunar total (€)
+      // fondul investitorilor = share% din chirie + share% din comision
+      const pool       = rentRev * (c.linenRentalSharePct / 100) + comRev * (c.laundryCommissionSharePct / 100);
+      const budget     = c.budgetEur || 1;
+      const myFrac     = Math.min(invest / budget, 1);     // cota ta din capital
+      const myShare    = pool * myFrac;                    // partea ta / lună (€)
+      const annual     = myShare * 12;
+      const payback    = myShare > 0 ? invest / myShare : 0; // luni până la amortizare
+      const salaryTot  = salary * 1.74;                    // cost total angajator (net → total ~×1,74)
+      // profitul platformei = ce rămâne din venit după fondul investitorilor, minus angajat + logistică
+      const platformNet = (revenue - pool) - salaryTot - opex;
+
+      const fmt = (n) => Math.round(n).toLocaleString("ro-RO");
+      const set = (id, txt) => { const e = $("#" + id); if (e) e.textContent = txt; };
+      set("ico_turnovers", turnovers.toLocaleString("ro-RO"));
+      set("ico_revenue", fmt(revenue) + " €");
+      set("ico_pool", fmt(pool) + " €");
+      set("ico_share", fmt(myShare) + " €");
+      set("ico_annual", fmt(annual) + " €");
+      set("ico_payback", payback > 0 ? (payback < 1 ? "< 1 lună" : Math.round(payback) + " luni") : "—");
+      set("ico_salaryTotal", fmt(salaryTot) + " €");
+      const pn = $("#ico_platformNet");
+      if (pn) {
+        pn.textContent = (platformNet >= 0 ? "+" : "") + fmt(platformNet) + " €";
+        pn.style.color = platformNet >= 0 ? "var(--h-blue, #009FE3)" : "#d64545";
+      }
+    };
+    box.querySelectorAll("input").forEach((inp) => {
+      inp.addEventListener("input", recalc);
+      inp.addEventListener("change", recalc);
+    });
+    recalc();
   }
 
   /* =========================================================
