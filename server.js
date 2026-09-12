@@ -576,6 +576,20 @@ async function activateVipServer(userId, locationIdsCsv, sessionId) {
   console.log("[stripe] VIP activat:", userId);
   return true;
 }
+const INVEST = { budgetEur: 10000, profitSharePct: 30, minEur: 500 };
+async function activateInvestmentServer(userId, amountEur, sessionId) {
+  const st = await getState();
+  const u = (st.users || []).find(x => x.id === userId);
+  if (!u) return false;
+  const amt = Math.round((Number(amountEur) || 0) * 100) / 100;
+  const now = Date.now();
+  const prev = (u.investment && u.investment.active) ? (Number(u.investment.amountEur) || 0) : 0;
+  u.investment = { active: true, amountEur: Math.round((prev + amt) * 100) / 100, since: (u.investment && u.investment.since) || now, lastPaymentAt: now };
+  if (sessionId) u.investment.stripeSessionId = sessionId;
+  await saveState(st);
+  console.log("[stripe] Investiție activată:", userId, "·", amt, "€");
+  return true;
+}
 async function markRequestPaid(reqId, sessionId) {
   const st = await getState();
   const r = (st.requests || []).find(x => x.id === reqId);
@@ -608,6 +622,8 @@ app.post("/api/pay/webhook", express.raw({ type: "application/json" }), async (r
       const s = event.data.object;
       if (s.payment_status === "paid" && s.metadata && s.metadata.vip) {
         await activateVipServer(s.metadata.vip, s.metadata.locationIds, s.id);
+      } else if (s.payment_status === "paid" && s.metadata && s.metadata.invest) {
+        await activateInvestmentServer(s.metadata.invest, s.metadata.amountEur, s.id);
       } else if (s.payment_status === "paid" && s.metadata && s.metadata.reqId) {
         await markRequestPaid(s.metadata.reqId, s.id);
       }
@@ -664,7 +680,7 @@ app.post("/api/auth/register", async (req, res) => {
     const role = b.role;
     if (!name || !email || pass.length < 4)
       return res.status(422).json({ ok: false, error: "Completează nume, email și parolă (min 4)." });
-    if (!["solicitant", "executant", "spalatorie"].includes(role))
+    if (!["solicitant", "executant", "spalatorie", "investitor"].includes(role))
       return res.status(422).json({ ok: false, error: "Rol invalid." });
     const needsBiz = role === "executant" || role === "spalatorie";
     if (needsBiz) {
@@ -852,6 +868,35 @@ app.post("/api/vip/admin-set", async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
+// --- Investiție în sistemul de închiriere lenjerii: Checkout (încasare în avans) ---
+app.post("/api/pay/invest/checkout", async (req, res) => {
+  try {
+    const uid = readSession(req);
+    if (!uid) return res.status(401).json({ ok: false, error: "Neautentificat." });
+    if (!stripe) return res.json({ ok: false, error: "stripe_unconfigured" });
+    const amountEur = Math.round((Number(req.body && req.body.amountEur) || 0) * 100) / 100;
+    if (amountEur < INVEST.minEur) return res.status(400).json({ ok: false, error: "Suma minimă este " + INVEST.minEur + " €." });
+    const proto = (req.headers["x-forwarded-proto"] || "https").split(",")[0];
+    const origin = req.headers.origin || (proto + "://" + req.headers.host);
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: [{
+        price_data: {
+          currency: "eur",
+          product_data: { name: "Investiție — sistem închiriere lenjerii Sleep & Go", description: INVEST.profitSharePct + "% din profit pe durata acționariatului" },
+          unit_amount: Math.round(amountEur * 100),
+        },
+        quantity: 1,
+      }],
+      metadata: { invest: uid, amountEur: String(amountEur) },
+      success_url: origin + "/?invest=1&session_id={CHECKOUT_SESSION_ID}",
+      cancel_url: origin + "/?investcancel=1",
+    });
+    res.json({ ok: true, url: session.url });
+  } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
+});
+
 // --- Confirmă plata după întoarcerea de pe pagina Stripe (success_url) ---
 app.get("/api/pay/verify", async (req, res) => {
   try {
@@ -862,6 +907,10 @@ app.get("/api/pay/verify", async (req, res) => {
     if (s && s.payment_status === "paid" && s.metadata && s.metadata.vip) {
       await activateVipServer(s.metadata.vip, s.metadata.locationIds, s.id);
       return res.json({ ok: true, paid: true, vip: true });
+    }
+    if (s && s.payment_status === "paid" && s.metadata && s.metadata.invest) {
+      await activateInvestmentServer(s.metadata.invest, s.metadata.amountEur, s.id);
+      return res.json({ ok: true, paid: true, invest: true });
     }
     if (s && s.payment_status === "paid" && s.metadata && s.metadata.reqId) {
       await markRequestPaid(s.metadata.reqId, s.id);

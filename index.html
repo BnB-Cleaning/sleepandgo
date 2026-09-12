@@ -494,6 +494,25 @@ a.pill.contact:hover { background: var(--brand); color: #fff; }
 .vip-price-row { margin-top: 12px; font-size: 15px; }
 .vip-price-row strong { color: #f4d58b; }
 
+/* ===== Investitor — panou & investiție ===== */
+.role-picker-4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+@media (min-width: 560px) { .role-picker-4 { grid-template-columns: repeat(4, 1fr); } }
+.inv-chart { display: flex; flex-direction: column; gap: 8px; }
+.inv-bar-row { display: grid; grid-template-columns: 64px 1fr auto; gap: 10px; align-items: center; }
+.inv-bar-lbl { font-size: 12.5px; color: var(--muted, #93a6b5); text-transform: capitalize; }
+.inv-track { background: var(--card-2, #22323f); border: 1px solid var(--line, #2c3e4f); border-radius: 8px; height: 30px; overflow: hidden; }
+.inv-fill { height: 100%; border-radius: 8px 0 0 8px; background: linear-gradient(90deg, var(--brand, #009FE3), #3aa0d8); display: flex; align-items: center; justify-content: flex-end; padding-right: 10px; color: #fff; font-weight: 700; font-size: 13px; min-width: 30px; }
+.inv-bar-side { font-size: 12px; color: var(--muted, #93a6b5); white-space: nowrap; }
+.investor-cta { border-top: 3px solid var(--brand, #009FE3); }
+.inv-badge { display: inline-block; font-size: 12px; font-weight: 700; color: #0a7d3f; background: #e4f5ea; padding: 4px 12px; border-radius: 999px; }
+.inv-progress { height: 12px; border-radius: 999px; background: var(--card-2, #22323f); border: 1px solid var(--line, #2c3e4f); overflow: hidden; }
+.inv-progress-bar { height: 100%; background: linear-gradient(90deg, #0a7d3f, #2ecc71); border-radius: 999px; transition: width .3s ease; }
+.invest-contract { background: var(--card-2, #22323f); border: 1px solid var(--line, #2c3e4f); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; font-size: 13.5px; line-height: 1.6; max-height: 240px; overflow-y: auto; }
+.invest-contract p { margin: 0 0 8px; }
+.invest-contract p:last-child { margin-bottom: 0; }
+.inv-accept { display: flex; align-items: flex-start; gap: 9px; font-size: 13.5px; color: var(--muted, #93a6b5); cursor: pointer; }
+.inv-accept input { margin-top: 3px; width: 17px; height: 17px; flex: 0 0 auto; }
+
 /* =========================================================
    Sleep & Go Cleaning — HOME / LANDING
    Brand preluat de pe sleepandgocleaning.com:
@@ -934,6 +953,11 @@ body.landing-active { background: var(--h-bg); }
 .vip-promo-list li { font-size: 15px; color: #33414f; font-weight: 500; }
 .vip-promo .vip-card { max-width: 100%; }
 
+/* ===== Investitor CTA pe landing închiriere ===== */
+.rental-invest { margin-top: 22px; padding: 18px 20px; background: #eaf6fd; border: 1px solid #cfe6f6; border-radius: 14px; }
+.rental-invest strong { display: block; font-family: "Poppins", sans-serif; color: var(--h-ink); font-size: 16px; }
+.rental-invest p { margin: 6px 0 12px; font-size: 14px; color: #33414f; }
+
 </style>
 
   <header class="topbar" id="topbar" hidden>
@@ -1006,6 +1030,8 @@ body.landing-active { background: var(--h-bg); }
     // Abonament VIP Member: 10% discount la fiecare solicitare; 100 lei/lună prima locație,
     // +50 lei/lună pentru fiecare locație suplimentară; se încasează în avans (Stripe).
     vip: { baseRon: 100, extraRon: 50, discountPct: 10, periodDays: 30 },
+    // Investiție în sistemul de închiriere lenjerii: buget-țintă 10.000 €, acționariat cu 30% din profit.
+    investment: { budgetEur: 10000, profitSharePct: 30, minEur: 500 },
     // Sărbători legale România (fixe, format „LL-ZZ"). Paștele/Rusaliile sunt mobile (neincluse).
     legalHolidays: ["01-01", "01-02", "01-24", "05-01", "06-01", "08-15", "11-30", "12-01", "12-25", "12-26"],
     // limită de dimensiune pentru documentul de suprafață (demo, salvat în localStorage)
@@ -1974,6 +2000,60 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
       catch (e) { return { ok: false, error: String(e.message || e) }; }
     },
     vipMembers() { return (db.users || []).filter(u => u.vip && u.vip.active).map(u => ({ id: u.id, name: u.name, email: u.email, ...this.vipInfo(u) })); },
+
+    // ---- Investiție în sistemul de închiriere lenjerii ----
+    investmentConfig() { return CONFIG.investment; },
+    // statistici pentru investitori: câte persoane s-au înscris la închiriere, câte lenjerii, evoluția lunară
+    rentalStats() {
+      const leads = db.rentalLeads || [];
+      const people = leads.length;
+      const linens = leads.reduce((s, l) => s + (Number(l.locations) || 0), 0);
+      const byMonth = {};
+      leads.forEach(l => {
+        const d = new Date(l.createdAt || Date.now());
+        const key = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+        if (!byMonth[key]) byMonth[key] = { month: key, people: 0, linens: 0 };
+        byMonth[key].people += 1; byMonth[key].linens += (Number(l.locations) || 0);
+      });
+      const monthly = Object.values(byMonth).sort((a, b) => a.month.localeCompare(b.month));
+      return { people, linens, monthly };
+    },
+    isInvestor(u) { return !!(u && u.investment && u.investment.active); },
+    investmentInfo(u) {
+      const c = CONFIG.investment;
+      const inv = (u && u.investment) || null;
+      return {
+        active: this.isInvestor(u),
+        amountEur: inv ? (Number(inv.amountEur) || 0) : 0,
+        since: inv ? inv.since : null,
+        sharePct: c.profitSharePct, budgetEur: c.budgetEur, minEur: c.minEur,
+        totalInvested: this.totalInvested(),
+      };
+    },
+    totalInvested() { return round2((db.users || []).reduce((s, u) => s + (u.investment && u.investment.active ? (Number(u.investment.amountEur) || 0) : 0), 0)); },
+    investors() {
+      return (db.users || []).filter(u => u.role === "investitor" || (u.investment && u.investment.active))
+        .map(u => ({ id: u.id, name: u.name, email: u.email, phone: u.phone || "",
+          amountEur: (u.investment && u.investment.active) ? (Number(u.investment.amountEur) || 0) : 0,
+          active: this.isInvestor(u), since: u.investment ? u.investment.since : null }))
+        .sort((a, b) => b.amountEur - a.amountEur);
+    },
+    // activează participarea (după plata simulată / mod local; pe server real din verify Stripe)
+    activateInvestment(amountEur) {
+      const u = this.currentUser(); if (!u) return { ok: false, error: "Neautentificat." };
+      const amt = round2(Number(amountEur) || 0);
+      if (amt < CONFIG.investment.minEur) return { ok: false, error: "Suma minimă de investiție este " + CONFIG.investment.minEur + " €." };
+      const now = Date.now();
+      const prev = (u.investment && u.investment.active) ? (Number(u.investment.amountEur) || 0) : 0;
+      u.investment = { active: true, amountEur: round2(prev + amt), since: (u.investment && u.investment.since) || now, lastPaymentAt: now };
+      this.updateUser(u.id, { investment: u.investment });
+      return { ok: true, investment: u.investment };
+    },
+    async payInvestCheckout(amountEur) {
+      if (MODE !== "api") return { ok: false, error: "demo" };
+      try { return await apiPOST("/api/pay/invest/checkout", { amountEur }); }
+      catch (e) { return { ok: false, error: String(e.message || e) }; }
+    },
     // admin: activează (marchează plătit) / revocă VIP pentru un cont, fără Stripe
     async adminSetVip(userId, active, locationIds) {
       if (MODE === "api") {
@@ -2725,7 +2805,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
       ${footer}
     </div>`;
   };
-  const roleLabel = { admin: "Administrator", solicitant: "Solicitant", executant: "Agent Cleaning", spalatorie: "Serviciu lenjerie" };
+  const roleLabel = { admin: "Administrator", solicitant: "Solicitant", executant: "Agent Cleaning", spalatorie: "Serviciu lenjerie", investitor: "Investitor" };
 
   function toast(msg, type = "") {
     const wrap = document.getElementById("toastWrap");
@@ -2843,7 +2923,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
       <form id="regForm">
         <div class="field">
           <label>Sunt...</label>
-          <div class="role-picker role-picker-3">
+          <div class="role-picker role-picker-4">
             <div class="role-opt ${regRole === "solicitant" ? "active" : ""}" data-role="solicitant">
               <span class="ico">🏠</span> Solicitant<br><small>vreau curățenie</small>
             </div>
@@ -2852,6 +2932,9 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
             </div>
             <div class="role-opt ${regRole === "spalatorie" ? "active" : ""}" data-role="spalatorie">
               <span class="ico">🧺</span> Serviciu lenjerie<br><small>spăl lenjeria</small>
+            </div>
+            <div class="role-opt ${regRole === "investitor" ? "active" : ""}" data-role="investitor">
+              <span class="ico">📈</span> Investitor<br><small>investesc în lenjerii</small>
             </div>
           </div>
         </div>
@@ -2971,6 +3054,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     if (activeRole === "admin") renderAdmin(u);
     else if (activeRole === "executant") renderExecutant(u);
     else if (activeRole === "spalatorie") renderSpalatorie(u);
+    else if (activeRole === "investitor") renderInvestor(u);
     else renderSolicitant(u);
 
     // poză de profil OBLIGATORIE pentru toți userii (nu redeschide dacă modalul e deja afișat)
@@ -3673,6 +3757,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     app.querySelectorAll("[data-article]").forEach(a => a.onclick = () => openArticle(a.dataset.article));
     app.querySelectorAll("[data-go]").forEach(b => b.onclick = () => { const t = b.dataset.go; if (t === "top") { window.scrollTo({ top: 0, behavior: "smooth" }); return; } goAuth(t); });
     app.querySelectorAll("[data-share]").forEach(b => b.onclick = shareSite);
+    app.querySelectorAll("[data-reg]").forEach(b => b.onclick = () => { regRole = b.dataset.reg; goAuth("register"); });
     wireNewsletterForms();
   }
 
@@ -3949,6 +4034,121 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         <div class="vip-perk">−${S.vipConfig().discountPct}% la fiecare solicitare</div>
         <div class="vip-foot"><span>de la ${S.vipConfig().baseRon} lei/lună</span><span>membru premium</span></div>
       </div>`;
+  }
+
+  /* ---------- Investitor: panou + investiție cu contract ---------- */
+  function renderInvestor(u) {
+    app.innerHTML = "";
+    const c = S.investmentConfig();
+    const st = S.rentalStats();
+    const info = S.investmentInfo(u);
+    const budgetPct = Math.min(100, Math.round((info.totalInvested / c.budgetEur) * 100));
+    const monthLabel = (m) => { const [y, mo] = m.split("-"); return new Date(y, mo - 1, 1).toLocaleDateString("ro-RO", { month: "short", year: "2-digit" }); };
+    const maxM = Math.max(1, ...st.monthly.map(x => x.people));
+    const chart = st.monthly.length
+      ? `<div class="inv-chart">${st.monthly.map(m => `
+          <div class="inv-bar-row"><span class="inv-bar-lbl">${monthLabel(m.month)}</span>
+            <div class="inv-track"><div class="inv-fill" style="width:${Math.max(6, Math.round(m.people / maxM * 100))}%">${m.people}</div></div>
+            <span class="inv-bar-side">${m.linens} lenj.</span></div>`).join("")}</div>`
+      : `<p class="hint" style="color:var(--muted,#8aa)">Încă nu există înscrieri la serviciul de închiriere. Graficul apare pe măsură ce oamenii se înregistrează.</p>`;
+
+    app.appendChild(el(`
+      <div class="page-head">
+        <h1>Salut, ${esc(u.name.split(" ")[0])} 📈</h1>
+        <p>Panou investitor — sistemul de <strong>închiriere lenjerii</strong> Sleep &amp; Go. Urmărești în timp real evoluția serviciului în care ai investit.</p>
+      </div>
+
+      <div class="grid cols-3" style="margin-bottom:20px">
+        <div class="card stat"><span class="label">Persoane înscrise la închiriere</span><span class="value brand">${st.people}</span></div>
+        <div class="card stat"><span class="label">Lenjerii solicitate (total)</span><span class="value">${st.linens}</span></div>
+        <div class="card stat"><span class="label">Capital strâns (acționariat)</span><span class="value">${info.totalInvested} €</span></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <strong>📊 Evoluția înscrierilor pe luni</strong>
+        <p class="hint" style="margin:4px 0 12px;color:var(--muted,#8aa)">Câte persoane s-au înscris la serviciul de închiriere lenjerii și câte lenjerii au solicitat, lună de lună.</p>
+        ${chart}
+      </div>
+
+      <div class="card investor-cta" style="margin-bottom:16px">
+        ${info.active
+          ? `<div class="inv-badge">✅ Ești acționar</div>
+             <h3 style="margin:6px 0 4px">Participarea ta: <span style="color:var(--brand)">${info.amountEur} €</span></h3>
+             <p class="hint" style="color:var(--muted,#8aa);margin:0 0 12px">Din ${new Date(info.since).toLocaleDateString("ro-RO")}. Primești <strong>${info.sharePct}% din profit</strong> pe durata acționariatului, proporțional cu aportul.</p>
+             <button class="btn" id="invMore">➕ Suplimentează investiția</button>`
+          : `<h3 style="margin:0 0 6px">Devino acționar în sistemul de închiriere lenjerii</h3>
+             <p style="margin:0 0 8px">Buget-țintă: <strong>${c.budgetEur.toLocaleString("ro-RO")} €</strong>. Primești <strong>${c.profitSharePct}% din profit</strong> pe durata cât ești acționar, plus o cotă din comisionul încasat de platformă pentru lenjeria spălată.</p>
+             <div class="inv-progress" title="${info.totalInvested} € din ${c.budgetEur} €"><div class="inv-progress-bar" style="width:${budgetPct}%"></div></div>
+             <p class="hint" style="color:var(--muted,#8aa);margin:6px 0 14px">Strâns până acum: <strong>${info.totalInvested} €</strong> din ${c.budgetEur.toLocaleString("ro-RO")} € (${budgetPct}%). Investiție minimă: ${c.minEur} €.</p>
+             <button class="btn btn-block" id="invJoin">📈 Investește · semnează contract</button>`}
+      </div>
+
+      <div class="card">
+        <strong>🧺 Cum funcționează serviciul în care investești</strong>
+        <ul style="margin:10px 0 0;padding-left:18px;line-height:1.9;color:var(--muted,#8aa)">
+          <li><strong style="color:inherit">Serviciu complet:</strong> oamenii <strong>închiriază</strong> lenjeria, iar prețul include și <strong>spălarea</strong> — aducerea lenjeriei curate și preluarea celei folosite. Nu putem garanta calitatea pe termen lung dacă lenjeria nu e spălată după standardele noastre.</li>
+          <li><strong style="color:inherit">Preț = chiria zilnică</strong> a lenjeriei + spălarea inclusă.</li>
+          <li><strong style="color:inherit">Banii investiți</strong> se folosesc la achiziția de lenjerii și prosoape, cipuri pentru etichetarea lor și sistemele de scanare a lenjeriilor.</li>
+          <li><strong style="color:inherit">Randament:</strong> ${c.profitSharePct}% din profit pe durata acționariatului + cotă din comisionul pe lenjeria spălată.</li>
+        </ul>
+      </div>
+    `));
+    const join = $("#invJoin"); if (join) join.onclick = () => openInvestPayment(u);
+    const more = $("#invMore"); if (more) more.onclick = () => openInvestPayment(u);
+    if (!u.avatar && !$("#raSave")) requireAvatar(u);
+  }
+  async function openInvestPayment(u) {
+    const c = S.investmentConfig();
+    modal(`
+      <h3 style="margin:0 0 10px">📈 Contract de investiție — acționariat lenjerii</h3>
+      <div class="invest-contract">
+        <p><strong>Părțile:</strong> S.C. GlobalApps S.R.L. („Platforma") și investitorul <strong>${esc(u.name)}</strong>.</p>
+        <p><strong>Obiect:</strong> participarea la acționariatul sistemului de închiriere lenjerii Sleep &amp; Go (buget-țintă ${c.budgetEur.toLocaleString("ro-RO")} €).</p>
+        <p><strong>Randament:</strong> <strong>${c.profitSharePct}% din profit</strong> pe durata cât investitorul rămâne acționar, proporțional cu aportul, plus o cotă din comisionul încasat pentru lenjeria spălată.</p>
+        <p><strong>Destinația fondurilor:</strong> achiziția de lenjerii și prosoape, cipuri de etichetare și sisteme de scanare a lenjeriilor.</p>
+        <p><strong>Retragere:</strong> distribuirea profitului se face pe perioada acționariatului; condițiile de retragere se stabilesc prin actul adițional semnat cu Platforma.</p>
+      </div>
+      <div class="field" style="max-width:220px"><label>Suma investită (€)</label><input id="invAmount" type="number" min="${c.minEur}" step="50" value="${c.minEur}" /></div>
+      <label class="inv-accept"><input type="checkbox" id="invAccept" /> <span>Am citit și accept contractul de investiție și distribuirea de ${c.profitSharePct}% din profit.</span></label>
+      <div class="field" style="margin-top:12px"><label>Informații card</label>
+        <div class="stripe-card">
+          <input id="iv_num" class="stripe-cardnum" placeholder="1234 1234 1234 1234" inputmode="numeric" maxlength="19"/>
+          <div class="stripe-card-row"><input id="iv_exp" placeholder="LL / AA" inputmode="numeric" maxlength="7"/><input id="iv_cvc" placeholder="CVC" inputmode="numeric" maxlength="4"/></div>
+        </div>
+        <div class="hint">Card de test: <span class="link" id="ivFill">4242 4242 4242 4242</span></div>
+      </div>
+      <button class="btn btn-block stripe-pay" id="invPayBtn">Semnează și plătește</button>
+      <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="_closeModal()">Renunță</button>
+      <p class="stripe-foot">🔒 Plată securizată prin Stripe. Investiția se încasează în avans, la începutul participării.</p>
+    `);
+    const num = $("#iv_num"), exp = $("#iv_exp"), cvc = $("#iv_cvc");
+    num.oninput = () => { let v = num.value.replace(/\D/g, "").slice(0, 16); num.value = v.replace(/(.{4})/g, "$1 ").trim(); };
+    exp.oninput = () => { let v = exp.value.replace(/\D/g, "").slice(0, 4); exp.value = v.length > 2 ? v.slice(0, 2) + " / " + v.slice(2) : v; };
+    cvc.oninput = () => { cvc.value = cvc.value.replace(/\D/g, "").slice(0, 4); };
+    $("#ivFill").onclick = () => { num.value = "4242 4242 4242 4242"; exp.value = "12 / 28"; cvc.value = "123"; };
+    $("#invPayBtn").onclick = async () => {
+      const amt = Number($("#invAmount").value) || 0;
+      if (!$("#invAccept").checked) return toast("Bifează acceptul contractului.", "err");
+      if (amt < c.minEur) return toast("Suma minimă de investiție este " + c.minEur + " €.", "err");
+      // 1) Stripe real
+      if (S.mode && S.mode() === "api") {
+        toast("Se pregătește plata securizată…", "");
+        const res = await S.payInvestCheckout(amt);
+        if (res && res.ok && res.url) { window.location.href = res.url; return; }
+        if (res && res.error && !["stripe_unconfigured", "demo"].includes(res.error)) return toast(res.error, "err");
+      }
+      // 2) Simulat
+      if (num.value.replace(/\s/g, "").length < 12 || exp.value.replace(/\D/g, "").length < 4 || cvc.value.length < 3)
+        return toast("Completează datele cardului (test: 4242 4242 4242 4242).", "err");
+      const btn = $("#invPayBtn"); btn.disabled = true; btn.textContent = "Se procesează…";
+      setTimeout(async () => {
+        const res = S.activateInvestment(amt);
+        if (S.mode && S.mode() === "api") { try { await S.flush(); } catch (e) {} }
+        closeModal();
+        if (res && res.ok) { toast("Contract semnat și investiție înregistrată! 📈", "ok"); renderInvestor(u); }
+        else toast((res && res.error) || "Eroare.", "err");
+      }, 1000);
+    };
   }
 
   /* ---------- SEO / AEO / GEO: meta tags + Open Graph + JSON-LD ---------- */
@@ -4434,6 +4634,11 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
                 <li>🏷️ Fiecare set etichetat individual</li>
                 <li>💸 Zero investiție inițială în lenjerie</li>
               </ul>
+              <div class="rental-invest">
+                <strong>📈 Ești investitor?</strong>
+                <p>Participă la acționariatul sistemului de închiriere lenjerii — buget-țintă ${C.investment.budgetEur.toLocaleString("ro-RO")} €, <strong>${C.investment.profitSharePct}% din profit</strong> pe durata acționariatului.</p>
+                <button class="h-btn ghost" type="button" data-reg="investitor">📈 Devino investitor</button>
+              </div>
             </div>
             <div class="h-rental-form card-mock">
               <h3 style="margin:0 0 4px;font-family:'Poppins',sans-serif">Înregistrează-te</h3>
@@ -5866,6 +6071,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     const newsCount = S.newsletterSubs().filter(s => !s.unsubscribed).length;
     const refPend = S.referrers().filter(r => r.eligible).length;
     const vipCount = S.vipMembers().length;
+    const investCount = S.investors().filter(x => x.active).length;
     app.appendChild(el(`
       <div class="page-head">
         <h1>Panou administrare</h1>
@@ -5885,6 +6091,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         <button data-t="newsletter" class="${adminTab === "newsletter" ? "active" : ""}">📧 Newsletter${newsCount ? ` (${newsCount})` : ""}</button>
         <button data-t="referral" class="${adminTab === "referral" ? "active" : ""}">🎁 Referral${refPend ? ` <span class="tab-alert">${refPend}</span>` : ""}</button>
         <button data-t="vip" class="${adminTab === "vip" ? "active" : ""}">👑 VIP${vipCount ? ` (${vipCount})` : ""}</button>
+        <button data-t="invest" class="${adminTab === "invest" ? "active" : ""}">📈 Investitori${investCount ? ` (${investCount})` : ""}</button>
       </div>
       <div id="admBody"></div>
     `));
@@ -5901,6 +6108,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     else if (adminTab === "newsletter") renderAdminNewsletter(u);
     else if (adminTab === "referral") renderAdminReferral(u);
     else if (adminTab === "vip") renderAdminVip(u);
+    else if (adminTab === "invest") renderAdminInvest(u);
     else renderAdminUsers();
   }
 
@@ -6162,6 +6370,41 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
       const res = await S.adminSetVip(b.dataset.id, false);
       if (res && res.ok) { toast("VIP revocat.", "ok"); renderAdmin(u); } else toast((res && res.error) || "Eroare.", "err");
     });
+  }
+
+  /* ---- Admin: Investitori (acționariat lenjerii) ---- */
+  function renderAdminInvest(u) {
+    const body = $("#admBody");
+    const c = S.investmentConfig();
+    const st = S.rentalStats();
+    const list = S.investors();
+    const total = S.totalInvested();
+    const budgetPct = Math.min(100, Math.round((total / c.budgetEur) * 100));
+    const muted = "var(--muted,#8aa)";
+    body.innerHTML = `
+      <div class="card" style="margin-bottom:14px">
+        <strong>📈 Investitori — sistem închiriere lenjerii</strong>
+        <p class="hint" style="margin:4px 0 0;color:${muted}">Acționariat cu buget-țintă <strong>${c.budgetEur.toLocaleString("ro-RO")} €</strong>. Investitorii primesc <strong>${c.profitSharePct}% din profit</strong> pe durata acționariatului, plus cotă din comisionul pe lenjeria spălată.</p>
+        <div class="news-counts">
+          <div class="nc"><span class="nc-n">${list.filter(x => x.active).length}</span><span class="nc-l">investitori</span></div>
+          <div class="nc"><span class="nc-n">${st.people}</span><span class="nc-l">înscrieri închiriere</span></div>
+          <div class="nc"><span class="nc-n">${st.linens}</span><span class="nc-l">lenjerii solicitate</span></div>
+          <div class="nc total"><span class="nc-n">${total} €</span><span class="nc-l">capital strâns</span></div>
+        </div>
+        <div class="inv-progress" style="margin-top:14px" title="${total} € din ${c.budgetEur} €"><div class="inv-progress-bar" style="width:${budgetPct}%"></div></div>
+        <p class="hint" style="color:${muted};margin:6px 0 0">${total} € din ${c.budgetEur.toLocaleString("ro-RO")} € (${budgetPct}% din buget).</p>
+      </div>
+      <div class="card">
+        <strong>Listă investitori</strong>
+        <div style="margin-top:10px">${list.length ? `<div class="subs-table">${list.map(m => `
+          <div class="subs-row">
+            <div class="sr-main"><strong>${esc(m.name)}</strong>${m.email ? " · " + esc(m.email) : ""}${m.phone ? " · " + esc(m.phone) : ""}
+              <div class="hint" style="color:${muted};margin-top:2px">${m.since ? "acționar din " + new Date(m.since).toLocaleDateString("ro-RO") : "cont creat, fără investiție"}</div>
+            </div>
+            <div class="sr-meta">${m.active ? `<span class="badge ok">${m.amountEur} € investiți</span>` : `<span class="badge">fără investiție</span>`}</div>
+          </div>`).join("")}</div>` : `<p class="hint" style="color:${muted}">Niciun investitor încă.</p>`}</div>
+      </div>
+    `;
   }
 
   function blogEditModal(post) {
@@ -7701,12 +7944,17 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     const cancelId = params.get("paycancel");
     const vipReturn = params.get("vip");
     const vipCancel = params.get("vipcancel");
-    if (!sessionId && !paidId && !cancelId && !vipReturn && !vipCancel) return;
+    const invReturn = params.get("invest");
+    const invCancel = params.get("investcancel");
+    if (!sessionId && !paidId && !cancelId && !vipReturn && !vipCancel && !invReturn && !invCancel) return;
     history.replaceState({}, "", location.pathname);   // curăță URL-ul
-    if (cancelId || vipCancel) { toast("Plată anulată.", ""); return; }
+    if (cancelId || vipCancel || invCancel) { toast("Plată anulată.", ""); return; }
     if (sessionId) {
       const res = await S.verifyPayment(sessionId);
-      if (res && res.ok && res.paid && res.vip) {
+      if (res && res.ok && res.paid && res.invest) {
+        await S.refresh();
+        toast("Contract semnat și investiție înregistrată! 📈", "ok");
+      } else if (res && res.ok && res.paid && res.vip) {
         await S.refresh();
         toast("Bine ai venit în clubul VIP! 👑", "ok");
       } else if (res && res.ok && res.paid) {
