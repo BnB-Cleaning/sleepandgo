@@ -1003,6 +1003,22 @@ body.landing-active { background: var(--h-bg); }
 .inv-live .il-note { margin: 14px 0 0; font-size: 12.5px; line-height: 1.55; opacity: .9; }
 @media (max-width: 560px) { .inv-live .il-grid { grid-template-columns: 1fr; } .inv-live .il-n { font-size: 34px; } }
 
+/* Buget detaliat de demarare (investitori) */
+.inv-budget { margin: 8px 0 0; }
+.inv-budget .budget-tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+.inv-budget .budget-tbl th, .inv-budget .budget-tbl td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--h-line); }
+.inv-budget .budget-tbl th { font-family: 'Poppins', sans-serif; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: var(--h-muted); background: var(--h-soft); }
+.inv-budget .budget-tbl td.num, .inv-budget .budget-tbl th.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.inv-budget .budget-tbl tr.sub td { color: #33414f; font-weight: 600; background: rgba(0,159,227,.04); }
+.inv-budget .budget-tbl tr.tot td { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 15.5px; color: var(--h-blue); background: rgba(0,159,227,.10); border-bottom: none; }
+.inv-budget .bt-note { margin: 8px 2px 0; font-size: 12px; color: var(--h-muted); line-height: 1.5; }
+/* varianta dark pentru dashboard (tokeni --card/--line/--muted/--brand) */
+.inv-budget.dark .budget-tbl th { background: var(--card-2, rgba(255,255,255,.03)); color: var(--muted, #8aa); }
+.inv-budget.dark .budget-tbl th, .inv-budget.dark .budget-tbl td { border-bottom-color: var(--line, rgba(255,255,255,.08)); }
+.inv-budget.dark .budget-tbl tr.sub td { color: var(--ink, #e8eef5); background: rgba(120,180,255,.06); }
+.inv-budget.dark .budget-tbl tr.tot td { color: var(--brand, #4aa8e0); background: rgba(120,180,255,.12); }
+.inv-budget.dark .bt-note { color: var(--muted, #8aa); }
+
 /* Punere în funcțiune ~3 luni (investitori) */
 .inv-timeline { background: var(--h-soft); border: 1px solid var(--h-line); border-radius: 16px; padding: 20px 22px; margin: 0 0 24px; }
 .inv-timeline h3 { font-family: 'Poppins', sans-serif; font-size: 18px; color: var(--h-ink); margin: 0 0 8px; }
@@ -1109,9 +1125,24 @@ body.landing-active { background: var(--h-bg); }
     // banii în avans — depun o GARANȚIE BANCARĂ până se adună toată suma. Randament: 50% din
     // comisionul încasat de platformă din serviciile de spălătorie (dus/luat/spălat lenjerie).
     // Randament investitori: 50% din comisionul de spălătorie + 50% din chiria lenjeriei.
-    // startupEur = capital minim pentru demararea proiectului; marginPct = marjă de siguranță (buffer)
-    // ca proiectul să nu se blocheze pentru sume mici; budgetEur = ținta de strâns = startup + marjă.
-    investment: { startupEur: 10000, marginPct: 30, budgetEur: 13000, laundryCommissionSharePct: 50, linenRentalSharePct: 50, minEur: 500, operationalSalaryEur: 1500 },
+    // Buget detaliat de demarare (spălătorie in-house completă). startupEur = suma liniilor din budgetItems;
+    // marginPct = marjă de siguranță; budgetEur = ținta de strâns = startup + marjă (recalculate în investmentConfig).
+    investment: {
+      budgetItems: [
+        { key: "equip",     label: "Mașini de spălat & uscătoare industriale (2 + 2)", eur: 28000 },
+        { key: "iron",      label: "Echipament de călcat (calandru/masă profesională, fier cu abur) + boiler apă caldă", eur: 10000 },
+        { key: "space",     label: "Amenajare & garanție spațiu spălătorie (racord apă, curent trifazat, ventilație, canalizare)", eur: 12000 },
+        { key: "linens",    label: "Stoc inițial lenjerii & prosoape (pentru rotație)", eur: 14000 },
+        { key: "rfid",      label: "Cipuri RFID + scanere + portal/software", eur: 6000 },
+        { key: "transport", label: "Transport — 2 autoutilitare + amenajare/branding", eur: 20000 },
+        { key: "permits",   label: "Autorizații (sanitară DSP, mediu, PSI), înființare firmă & consultanță", eur: 3000 },
+        { key: "runway",    label: "Capital de lucru — salarii (operațional + personal spălătorie), chirie, utilități, consumabile & combustibil până la primele contracte (~5 luni, incl. timpul de obținere a autorizațiilor)", eur: 32000 },
+      ],
+      marginPct: 20,
+      laundryCommissionSharePct: 50, linenRentalSharePct: 50, minEur: 500, operationalSalaryEur: 1500,
+      // fallback (recalculate din budgetItems + marginPct):
+      startupEur: 125000, budgetEur: 150000,
+    },
     // Sărbători legale România (fixe, format „LL-ZZ"). Paștele/Rusaliile sunt mobile (neincluse).
     legalHolidays: ["01-01", "01-02", "01-24", "05-01", "06-01", "08-15", "11-30", "12-01", "12-25", "12-26"],
     // limită de dimensiune pentru documentul de suprafață (demo, salvat în localStorage)
@@ -2084,9 +2115,19 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
     // ---- Investiție în sistemul de închiriere lenjerii ----
     investmentConfig() {
       const c = CONFIG.investment;
+      const items = Array.isArray(c.budgetItems) ? c.budgetItems : [];
+      // capitalul de demarare = suma liniilor din bugetul detaliat (sursă unică de adevăr)
+      const startupEur = items.length
+        ? items.reduce((s, i) => s + (Number(i.eur) || 0), 0)
+        : (Number(c.startupEur) || 0);
       // ținta de strâns = capitalul de demarare + marja de siguranță (recalculată, ca să rămână coerentă)
-      const budgetEur = Math.round((Number(c.startupEur) || 0) * (1 + (Number(c.marginPct) || 0) / 100)) || c.budgetEur;
-      return { ...c, budgetEur };
+      const budgetEur = Math.round(startupEur * (1 + (Number(c.marginPct) || 0) / 100)) || c.budgetEur;
+      return { ...c, startupEur, budgetEur, budgetItems: items };
+    },
+    // liniile bugetului de demarare + total + țintă (pentru statistici și planul de business)
+    budgetBreakdown() {
+      const c = this.investmentConfig();
+      return { items: c.budgetItems, startupEur: c.startupEur, marginPct: c.marginPct, budgetEur: c.budgetEur };
     },
     // statistici pentru investitori: câte persoane s-au înscris la închiriere, câte lenjerii, evoluția lunară
     rentalStats() {
@@ -4207,6 +4248,12 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
       </div>
 
       <div class="card" style="margin-bottom:16px">
+        <strong>🏗️ Bugetul de demarare — ${c.startupEur.toLocaleString("ro-RO")} € (țintă ${c.budgetEur.toLocaleString("ro-RO")} €)</strong>
+        <p class="hint" style="margin:4px 0 12px;color:var(--muted,#8aa)">Ce acoperă capitalul: spălătorie proprie (echipamente de spălat, uscat, călcat), amenajarea spațiului, transportul, stocul de lenjerii, cipurile RFID, autorizațiile și capitalul de lucru pe perioada de lansare (~3 luni) până la primele contracte.</p>
+        ${budgetTable(c, { dark: true })}
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
         <strong>💶 Randamentul tău — ${info.rentalSharePct}% din chirie + ${info.sharePct}% din spălătorie</strong>
         <p class="hint" style="margin:4px 0 12px;color:var(--muted,#8aa)">Investitorii primesc <strong>${info.rentalSharePct}% din chiria lenjeriei</strong> și <strong>${info.sharePct}% din comisionul de spălătorie</strong> încasat de platformă, proporțional cu garanția depusă.</p>
         <div class="grid cols-2" style="margin-bottom:12px">
@@ -4722,6 +4769,26 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     );
   }
 
+  // tabel cu bugetul detaliat de demarare (linii + total + marjă + țintă)
+  function budgetTable(c, opts) {
+    opts = opts || {};
+    const items = (c.budgetItems || []);
+    const margin = Math.round(c.startupEur * (c.marginPct / 100));
+    const rows = items.map(i => `<tr><td>${esc(i.label)}</td><td class="num">${(Number(i.eur) || 0).toLocaleString("ro-RO")} €</td></tr>`).join("");
+    return `<div class="inv-budget ${opts.dark ? "dark" : ""}">
+      <div class="tbl-wrap"><table class="budget-tbl">
+        <thead><tr><th>Componentă</th><th class="num">Cost estimat</th></tr></thead>
+        <tbody>
+          ${rows}
+          <tr class="sub"><td>Capital de demarare</td><td class="num">${c.startupEur.toLocaleString("ro-RO")} €</td></tr>
+          <tr class="sub"><td>Marjă de siguranță (+${c.marginPct}%)</td><td class="num">${margin.toLocaleString("ro-RO")} €</td></tr>
+          <tr class="tot"><td>Țintă totală de strâns</td><td class="num">${c.budgetEur.toLocaleString("ro-RO")} €</td></tr>
+        </tbody>
+      </table></div>
+      <p class="bt-note">Estimări de lucru, ajustabile pe baza ofertelor reale (echipamente noi/second-hand, spațiu, tarife). Capitalul de lucru acoperă lansarea de ~3 luni și perioada până la primele contracte.</p>
+    </div>`;
+  }
+
   function renderInvestorLanding() {
     const c = S.investmentConfig();
     const rs = S.rentalStats();
@@ -4756,7 +4823,8 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
 
         <div class="inv-need-box">
           <h3 style="margin:0 0 6px">De cât capital e nevoie</h3>
-          <p style="margin:0">Pentru demararea proiectului e nevoie de <strong>${c.startupEur.toLocaleString("ro-RO")} €</strong> (lenjerii, prosoape, cipuri de etichetare, sisteme de scanare, prima rută). Strângem însă <strong>${c.budgetEur.toLocaleString("ro-RO")} €</strong> — capitalul de demarare <strong>plus o marjă de siguranță de ${c.marginPct}%</strong> — ca proiectul să pornească solid și <strong>să nu se blocheze pentru sume mici</strong> sau cheltuieli neprevăzute. Banii nu se colectează în avans: fiecare investitor depune o <strong>garanție bancară</strong>, activată abia la atingerea țintei.</p>
+          <p style="margin:0 0 12px">Bugetul acoperă un sistem complet, cu <strong>spălătorie proprie</strong>: echipamente de spălat, uscat și călcat, amenajarea spațiului, mașinile de transport, stocul de lenjerii și prosoape, cipurile RFID, autorizațiile — plus <strong>capitalul de lucru</strong> care susține salariile și cheltuielile pe perioada de lansare, până vin autorizațiile și apar primele contracte. Total de demarare: <strong>${c.startupEur.toLocaleString("ro-RO")} €</strong>. Strângem însă <strong>${c.budgetEur.toLocaleString("ro-RO")} €</strong> — capitalul de demarare <strong>plus o marjă de siguranță de ${c.marginPct}%</strong> — ca proiectul să pornească solid și <strong>să nu se blocheze pentru sume mici</strong> sau cheltuieli neprevăzute. Banii nu se colectează în avans: fiecare investitor depune o <strong>garanție bancară</strong>, activată abia la atingerea țintei.</p>
+          ${budgetTable(c)}
         </div>
 
         <div class="inv-timeline">
@@ -4774,7 +4842,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
           <p style="margin:0 0 4px">Estimează-ți randamentul — modifică ipotezele și totul se recalculează instant.</p>
           <p class="hint" style="margin:0 0 16px;color:var(--h-muted)">Modelul include și un <strong>angajat operațional</strong> (min. <strong>${c.operationalSalaryEur.toLocaleString("ro-RO")} € net/lună</strong>) care lansează proiectul în ~3 luni: pune la punct <strong>spălătoria</strong>, angajează <strong>personalul de spălare</strong> și <strong>de călcat lenjeria</strong>, contactează și găsește furnizorii de lenjerii, comandă cipurile și echipamentele de spălătorie, coordonează transportul, alimentarea și restul operațiunilor.</p>
           <div class="calc-grid">
-            <label>Investiția ta (€)<input type="number" id="ic_invest" value="3000" min="0" step="100"></label>
+            <label>Investiția ta (€)<input type="number" id="ic_invest" value="15000" min="0" step="500"></label>
             <label>Seturi de lenjerie<input type="number" id="ic_sets" value="200" min="0"></label>
             <label>Rotații / set / lună<input type="number" id="ic_rot" value="8" min="0"></label>
             <label>Chirie / rotație (lei)<input type="number" id="ic_rent" value="8" min="0"></label>
@@ -4886,7 +4954,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
             <tr class="total"><td>OPEX lunar (2 rute + 1 stație + software)</td><td class="r">&nbsp;</td><td class="r">€4.400–6.500</td></tr>
           </tbody>
         </table></div>
-        <p>Hub-ul și spălătoria nu sunt în calcul — dacă externalizezi spălarea, dispar; dacă o faci in-house, adaugă €40.000–120.000 echipamente plus spațiu.</p>
+        <p>Tabelul de mai sus este o analiză de tip CAPEX/OPEX pe scenariul cu spălare externalizată. <strong>Bugetul total de demarare din acest plan pornește însă de la varianta cu spălătorie proprie (in-house)</strong> — care internalizează spălarea și adaugă echipamentele, spațiul, transportul, autorizațiile și capitalul de lucru până la primele contracte. Vezi defalcarea completă la începutul paginii („De cât capital e nevoie"): total <strong>${c.startupEur.toLocaleString("ro-RO")} €</strong>, țintă de strâns <strong>${c.budgetEur.toLocaleString("ro-RO")} €</strong> (cu marjă +${c.marginPct}%).</p>
 
         <h2>7. Ordinea fazelor (se inversează)</h2>
         <p>Cu portofoliul întins pe 35 km și cu hoteluri în ecuație, stația nu mai e pasul 2 — e pasul 4.</p>
@@ -4994,6 +5062,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
 
   function renderRentalLanding() {
     topbar.hidden = true;
+    const ic = S.investmentConfig();
     document.body.classList.add("landing-active");
     applyBasicSeo("Închiriere lenjerii regim hotelier | " + SITE_NAME, "Închiriază lenjerie pentru regim hotelier (Airbnb, Booking): ți-o aducem, o ridicăm după check-out, o spălăm și o returnăm. Fără investiție în lenjerie proprie — completează formularul și te contactăm.", "/inchiriere-lenjerii");
     app.innerHTML = "";
@@ -5024,7 +5093,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
               </ul>
               <div class="rental-invest">
                 <strong>📈 Ești investitor?</strong>
-                <p>Participă la acționariatul sistemului de închiriere lenjerii — buget-țintă ${C.investment.budgetEur.toLocaleString("ro-RO")} €, <strong>${C.investment.linenRentalSharePct}% din chirie + ${C.investment.laundryCommissionSharePct}% din spălătorie</strong>. Fără plată în avans — doar garanție bancară.</p>
+                <p>Participă la acționariatul sistemului de închiriere lenjerii — buget-țintă ${ic.budgetEur.toLocaleString("ro-RO")} €, <strong>${ic.linenRentalSharePct}% din chirie + ${ic.laundryCommissionSharePct}% din spălătorie</strong>. Fără plată în avans — doar garanție bancară.</p>
                 <div class="cta-row"><button class="h-btn primary" type="button" data-view="investitori">📄 Vezi planul complet</button><button class="h-btn ghost" type="button" data-reg="investitor">📈 Devino investitor</button></div>
               </div>
             </div>
