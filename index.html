@@ -513,6 +513,11 @@ a.pill.contact:hover { background: var(--brand); color: #fff; }
 .inv-accept { display: flex; align-items: flex-start; gap: 9px; font-size: 13.5px; color: var(--muted, #93a6b5); cursor: pointer; }
 .inv-accept input { margin-top: 3px; width: 17px; height: 17px; flex: 0 0 auto; }
 
+/* ===== Investitor — listă anonimizată de cereri ===== */
+.inv-req-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.inv-req { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--card-2, #22323f); border: 1px solid var(--line, #2c3e4f); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+.inv-req strong { color: var(--brand, #009FE3); }
+
 /* =========================================================
    Sleep & Go Cleaning — HOME / LANDING
    Brand preluat de pe sleepandgocleaning.com:
@@ -2036,7 +2041,21 @@ Un turnover bun o dată nu ajunge. Rating-ul se construiește din curățenie co
         byMonth[key].people += 1; byMonth[key].linens += (Number(l.locations) || 0);
       });
       const monthly = Object.values(byMonth).sort((a, b) => a.month.localeCompare(b.month));
-      return { people, linens, monthly };
+      // listă ANONIMIZATĂ a cererilor (doar nr. lenjerii + data), pentru investitori
+      const requests = leads.map(l => ({ locations: Number(l.locations) || 0, createdAt: l.createdAt || 0 }))
+        .sort((a, b) => b.createdAt - a.createdAt);
+      return { people, linens, monthly, requests };
+    },
+    // admin: importă/adaugă solicitanți (leads) în baza de date (ex. din CSV)
+    adminAddRentalLeads(leads) {
+      if (!Array.isArray(leads) || !leads.length) return { ok: false, error: "Niciun rând valid." };
+      if (!db.rentalLeads) db.rentalLeads = [];
+      leads.forEach(l => db.rentalLeads.push({
+        id: uid("lead"), name: l.name || "—", phone: l.phone || "", email: l.email || "",
+        locations: Number(l.locations) || 0, note: l.note || "", city: l.city || "", address: l.address || "",
+        source: l.source || "import", createdAt: l.createdAt || Date.now(),
+      }));
+      save(db); return { ok: true, added: leads.length };
     },
     isInvestor(u) { return !!(u && u.investment && u.investment.active); },
     // comisionul total încasat de platformă din serviciile de spălătorie (lenjerie spălată & returnată)
@@ -4116,6 +4135,14 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
         <strong>📊 Evoluția solicitanților pe luni</strong>
         <p class="hint" style="margin:4px 0 12px;color:var(--muted,#8aa)">Câți solicitanți s-au înscris la serviciul de închiriere lenjerii și câte lenjerii au cerut, lună de lună.</p>
         ${chart}
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <strong>🧺 Cererile de închiriere (${st.requests.length})</strong>
+        <p class="hint" style="margin:4px 0 12px;color:var(--muted,#8aa)">Ce au solicitat oamenii — câte lenjerii au cerut. <strong>Fără date personale</strong> (numele și contactele sunt vizibile doar administratorului).</p>
+        ${st.requests.length
+          ? `<div class="inv-req-list">${st.requests.slice(0, 60).map((r, i) => `<div class="inv-req"><span>#${i + 1} · 🧺 <strong>${r.locations || "—"}</strong> lenjerii</span><span class="hint" style="color:var(--muted,#8aa)">${r.createdAt ? new Date(r.createdAt).toLocaleDateString("ro-RO") : ""}</span></div>`).join("")}</div>`
+          : `<p class="hint" style="color:var(--muted,#8aa)">Nicio cerere încă.</p>`}
       </div>
 
       <div class="card" style="margin-bottom:16px">
@@ -6547,6 +6574,61 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
     });
   }
 
+  /* Parser CSV (gestionează ghilimele, virgule și newline-uri în câmpuri) */
+  function parseCsv(text) {
+    const rows = []; let row = [], field = "", inQ = false;
+    text = String(text).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (inQ) {
+        if (ch === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+        else field += ch;
+      } else {
+        if (ch === '"') inQ = true;
+        else if (ch === ",") { row.push(field); field = ""; }
+        else if (ch === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+        else field += ch;
+      }
+    }
+    if (field.length || row.length) { row.push(field); rows.push(row); }
+    return rows.filter(r => r.length && r.some(c => c.trim() !== ""));
+  }
+  // estimează câte lenjerii a cerut cineva din textul liber
+  function parseLinenCount(text) {
+    if (!text) return 0;
+    const t = String(text).toLowerCase(); let total = 0, found = false;
+    const re = /(\d+)\s*(?:de\s+)?(lenjerii|lenjerie|seturi|set|buc|bucati|bucăți|camere|camera|paturi|pat)\b/g;
+    let m; while ((m = re.exec(t))) { total += parseInt(m[1], 10); found = true; }
+    if (found) return total;
+    const lead = t.match(/^\s*(\d+)\b/); return lead ? parseInt(lead[1], 10) : 0;
+  }
+  // importă CSV-ul „Cerere ofertă închiriere lenjerii" (Nume, Prenume, Email, Telefon, Cate lenjerii…, Adresă, Oraș)
+  function importRentalCsv(text) {
+    const rows = parseCsv(text);
+    if (rows.length < 2) return { ok: false, error: "CSV gol sau invalid." };
+    const header = rows[0].map(h => h.trim().toLowerCase());
+    const col = (names) => header.findIndex(h => names.some(n => h.includes(n)));
+    const iDate = col(["submission", "data", "date"]), iNume = col(["nume"]), iPren = col(["prenume"]),
+      iEmail = col(["email"]), iTel = col(["telefon", "phone"]), iNeed = col(["cate lenjerii", "lenjerii ai nevoie", "dimensiuni"]),
+      iAddr = col(["street", "adres"]), iCity = col(["city", "oraș", "oras"]);
+    const leads = [];
+    for (let r = 1; r < rows.length; r++) {
+      const c = rows[r]; if (!c || !c.length) continue;
+      const nume = (iNume >= 0 ? c[iNume] : "").trim(), pren = (iPren >= 0 ? c[iPren] : "").trim();
+      const name = [pren, nume].filter(Boolean).join(" ") || [nume, pren].filter(Boolean).join(" ") || "—";
+      const phone = (iTel >= 0 ? c[iTel] : "").trim(), email = (iEmail >= 0 ? c[iEmail] : "").trim();
+      const need = (iNeed >= 0 ? c[iNeed] : "").trim();
+      if (!phone && !email && name === "—") continue;
+      const dRaw = (iDate >= 0 ? c[iDate] : "").trim();
+      const ts = dRaw ? (new Date(dRaw).getTime() || Date.now()) : Date.now();
+      leads.push({ name, phone, email, note: need, locations: parseLinenCount(need),
+        address: (iAddr >= 0 ? c[iAddr] : "").trim(), city: (iCity >= 0 ? c[iCity] : "").trim(),
+        source: "csv", createdAt: ts });
+    }
+    if (!leads.length) return { ok: false, error: "Niciun rând valid găsit." };
+    return S.adminAddRentalLeads(leads);
+  }
+
   /* ---- Admin: Investitori (acționariat lenjerii) ---- */
   function renderAdminInvest(u) {
     const body = $("#admBody");
@@ -6596,8 +6678,11 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
       </div>
 
       <div class="card">
-        <strong>🛎️ Contacte campanie „Închiriere lenjerii" (${leads.length})</strong>
-        <p class="hint" style="margin:4px 0 10px;color:${muted}">Persoanele înscrise din formularul de închiriere — baza de contacte pentru serviciul în care investesc.</p>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+          <strong>🛎️ Contacte campanie „Închiriere lenjerii" (${leads.length})</strong>
+          <div><input type="file" id="csvImport" accept=".csv,text/csv" hidden><button class="btn btn-sm" id="csvImportBtn">📥 Importă CSV</button></div>
+        </div>
+        <p class="hint" style="margin:4px 0 10px;color:${muted}">Persoanele înscrise din formularul de închiriere — <strong>vizibile doar administratorului</strong>. Investitorii văd doar numărul și câte lenjerii au cerut. Importă fișierul „Cerere ofertă închiriere lenjerii".</p>
         <div>${leads.length ? `<div class="subs-table">${leads.map(l => `
           <div class="subs-row">
             <div class="sr-main"><strong>${esc(l.name)}</strong> · 📞 ${esc(l.phone)}${l.email ? " · ✉️ " + esc(l.email) : ""}
@@ -6606,6 +6691,21 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
           </div>`).join("")}</div>` : `<p class="hint" style="color:${muted}">Nicio înregistrare încă.</p>`}</div>
       </div>
     `;
+    const csvBtn = $("#csvImportBtn"), csvInput = $("#csvImport");
+    if (csvBtn && csvInput) {
+      csvBtn.onclick = () => csvInput.click();
+      csvInput.onchange = (e) => {
+        const f = e.target.files && e.target.files[0]; if (!f) return;
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const res = importRentalCsv(reader.result);
+          if (res && res.ok) { try { await S.flush(); } catch (er) {} toast(`Import reușit: ${res.added} solicitanți adăugați.`, "ok"); renderAdmin(u); }
+          else toast((res && res.error) || "Import eșuat.", "err");
+        };
+        reader.onerror = () => toast("Nu s-a putut citi fișierul.", "err");
+        reader.readAsText(f, "utf-8");
+      };
+    }
   }
 
   function blogEditModal(post) {

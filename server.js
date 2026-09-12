@@ -740,10 +740,20 @@ app.get("/api/auth/me", async (req, res) => {
 });
 
 // --- Stare partajată ---
+// Elimină datele personale ale solicitanților pentru non-admini (investitorii văd doar agregate)
+function sanitizeStateForNonAdmin(st) {
+  const out = { ...st };
+  out.rentalLeads = (st.rentalLeads || []).map(l => ({ locations: Number(l.locations) || 0, createdAt: l.createdAt }));
+  out.offerLeads = (st.offerLeads || []).map(l => ({ createdAt: l.createdAt }));
+  return out;
+}
 app.get("/api/state", async (req, res) => {
   const st = await getState();
-  // nu trimitem parole (ele stau în pw:<id>, nu în state)
-  res.json({ ok: true, state: st, sessionUid: readSession(req) });
+  const id = readSession(req);
+  const me = (st.users || []).find(u => u.id === id);
+  const isAdmin = !!(me && me.role === "admin");
+  // nu trimitem parole (ele stau în pw:<id>) și ascundem datele personale ale solicitanților de non-admini
+  res.json({ ok: true, state: isAdmin ? st : sanitizeStateForNonAdmin(st), sessionUid: id });
 });
 
 app.post("/api/state", async (req, res) => {
@@ -760,6 +770,10 @@ app.post("/api/state", async (req, res) => {
     mergeNewsletter(prev, incoming);   // abonații rămân sub controlul serverului
     mergeReferral(prev, incoming);     // registrul de referral rămâne sub controlul serverului
     creditReferrals(prev, incoming);   // creditează recomandările la finalizarea solicitărilor
+    // doar adminul poate modifica lista de solicitanți (leads); non-adminii primesc versiunea agregată,
+    // deci le păstrăm intacte pe cele reale ca să nu le suprascrie / piardă la salvare
+    const me = (prev.users || []).find(u => u.id === id);
+    if (!(me && me.role === "admin")) { incoming.rentalLeads = prev.rentalLeads || []; incoming.offerLeads = prev.offerLeads || []; }
   } catch (e) { console.log("[notify] diff eșuat:", e.message); }
   // păstrăm parolele intacte: state nu conține parole, deci doar salvăm (cu flag-urile de notificare)
   await saveState(incoming);
