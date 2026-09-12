@@ -993,6 +993,16 @@ body.landing-active { background: var(--h-bg); }
 .inv-need-box h3 { font-family: 'Poppins', sans-serif; font-size: 17px; color: var(--h-ink); }
 .inv-need-box p { margin: 0; font-size: 15px; line-height: 1.65; color: #33414f; }
 
+/* Cerere reală (investitori) — persoane înscrise + lenjerii solicitate */
+.inv-live { background: linear-gradient(135deg, var(--h-blue), var(--h-navy, #3D66AE)); color: #fff; border-radius: 18px; padding: 22px 24px; margin: 0 0 24px; box-shadow: 0 12px 34px rgba(0,110,180,.22); }
+.inv-live .il-head { font-family: 'Poppins', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: .04em; text-transform: uppercase; opacity: .92; margin-bottom: 14px; }
+.inv-live .il-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.inv-live .il-item { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22); border-radius: 14px; padding: 16px 18px; text-align: center; }
+.inv-live .il-n { display: block; font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 40px; line-height: 1; }
+.inv-live .il-l { display: block; font-size: 13px; margin-top: 8px; opacity: .95; }
+.inv-live .il-note { margin: 14px 0 0; font-size: 12.5px; line-height: 1.55; opacity: .9; }
+@media (max-width: 560px) { .inv-live .il-grid { grid-template-columns: 1fr; } .inv-live .il-n { font-size: 34px; } }
+
 /* Calculator de profitabilitate (investitori) */
 .calc { background: #fff; border: 1px solid var(--h-line); border-radius: 16px; padding: 22px 22px 20px; margin: 0 0 28px; box-shadow: 0 8px 30px rgba(16,42,73,.06); }
 .calc h2 { font-family: 'Poppins', sans-serif; font-size: 20px; color: var(--h-ink); }
@@ -4699,6 +4709,7 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
 
   function renderInvestorLanding() {
     const c = S.investmentConfig();
+    const rs = S.rentalStats();
     renderStaticPage(
       "Investitori — infrastructură de lenjerie | " + SITE_NAME,
       "Investește în infrastructura de închiriere & spălare lenjerii Sleep & Go: 50% din comisionul de spălătorie, garanție bancară (fără plată în avans), buget-țintă 10.000 €. Planul complet: hoteluri, STR, rute, stații, RFID/COG, faze.",
@@ -4712,6 +4723,15 @@ window.SHOTS = {"client":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QB
       </div>
 
       <div class="ba-body">
+        <div class="inv-live">
+          <div class="il-head">Cerere reală, până în prezent</div>
+          <div class="il-grid">
+            <div class="il-item"><span class="il-n">${rs.people.toLocaleString("ro-RO")}</span><span class="il-l">persoane înscrise pentru serviciul de lenjerie</span></div>
+            <div class="il-item"><span class="il-n">${rs.linens.toLocaleString("ro-RO")}</span><span class="il-l">lenjerii solicitate în total</span></div>
+          </div>
+          <p class="il-note">Cifre actualizate automat pe măsură ce se înscriu noi solicitanți prin formularul de închiriere. Datele personale rămân confidențiale — vezi doar volumul cererii.</p>
+        </div>
+
         <div class="inv-model">
           <div class="im-item"><span class="im-n">${c.linenRentalSharePct}% + ${c.laundryCommissionSharePct}%</span><span class="im-l">din chirie + din spălătorie</span></div>
           <div class="im-item"><span class="im-n">${c.startupEur.toLocaleString("ro-RO")} €</span><span class="im-l">necesar pentru demarare</span></div>
